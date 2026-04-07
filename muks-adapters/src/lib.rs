@@ -175,7 +175,15 @@ impl Adapter for LivelyAdapter {
         Ok(artifact("lively", vec![file]))
     }
     fn apply(&self, request: &ApplyRequest) -> Result<GeneratedArtifact> {
-        self.render(request)
+        let mut artifact = self.render(request)?;
+        let source = PathBuf::from(&artifact.files[0]);
+        let target = resolve_lively_target(request);
+        copy_with_parent(&source, &target)?;
+        artifact.live_targets = vec![target.display().to_string()];
+        artifact
+            .notes
+            .push("Synced to managed lively payload target.".to_string());
+        Ok(artifact)
     }
     fn backup(&self, _paths: &AppPaths) -> Result<()> {
         Ok(())
@@ -249,7 +257,20 @@ impl Adapter for RainmeterAdapter {
         Ok(artifact("rainmeter", vec![file]))
     }
     fn apply(&self, request: &ApplyRequest) -> Result<GeneratedArtifact> {
-        self.render(request)
+        let mut artifact = self.render(request)?;
+        let source = PathBuf::from(&artifact.files[0]);
+        let target = resolve_rainmeter_target(request);
+        copy_with_parent(&source, &target)?;
+        artifact.live_targets = vec![target.display().to_string()];
+        if let Some(executable) = locate_rainmeter_exe() {
+            let _ = std::process::Command::new(executable)
+                .arg("!RefreshApp")
+                .status();
+            artifact
+                .notes
+                .push("Attempted Rainmeter refresh hook.".to_string());
+        }
+        Ok(artifact)
     }
     fn backup(&self, _paths: &AppPaths) -> Result<()> {
         Ok(())
@@ -324,7 +345,23 @@ impl Adapter for YasbAdapter {
         Ok(artifact("yasb", vec![config_file, styles_file]))
     }
     fn apply(&self, request: &ApplyRequest) -> Result<GeneratedArtifact> {
-        self.render(request)
+        let mut artifact = self.render(request)?;
+        let source_config = PathBuf::from(&artifact.files[0]);
+        let source_styles = PathBuf::from(&artifact.files[1]);
+        let (target_config, target_styles) = resolve_yasb_targets(request);
+        copy_with_parent(&source_config, &target_config)?;
+        copy_with_parent(&source_styles, &target_styles)?;
+        artifact.live_targets = vec![
+            target_config.display().to_string(),
+            target_styles.display().to_string(),
+        ];
+        if command_exists("yasb.exe") {
+            let _ = std::process::Command::new("yasb").arg("--reload").status();
+            artifact
+                .notes
+                .push("Attempted YASB reload hook.".to_string());
+        }
+        Ok(artifact)
     }
     fn backup(&self, _paths: &AppPaths) -> Result<()> {
         Ok(())
@@ -401,7 +438,20 @@ impl Adapter for KomorebiAdapter {
         Ok(artifact("komorebi", vec![file]))
     }
     fn apply(&self, request: &ApplyRequest) -> Result<GeneratedArtifact> {
-        self.render(request)
+        let mut artifact = self.render(request)?;
+        let source = PathBuf::from(&artifact.files[0]);
+        let target = resolve_komorebi_target(request);
+        copy_with_parent(&source, &target)?;
+        artifact.live_targets = vec![target.display().to_string()];
+        if command_exists("komorebic.exe") {
+            let _ = std::process::Command::new("komorebic")
+                .arg("reload-configuration")
+                .status();
+            artifact
+                .notes
+                .push("Attempted Komorebi reload hook.".to_string());
+        }
+        Ok(artifact)
     }
     fn backup(&self, _paths: &AppPaths) -> Result<()> {
         Ok(())
@@ -472,7 +522,15 @@ impl Adapter for WindhawkAdapter {
         Ok(artifact("windhawk", vec![file]))
     }
     fn apply(&self, request: &ApplyRequest) -> Result<GeneratedArtifact> {
-        self.render(request)
+        let mut artifact = self.render(request)?;
+        let source = PathBuf::from(&artifact.files[0]);
+        let target = resolve_windhawk_target(request);
+        copy_with_parent(&source, &target)?;
+        artifact.live_targets = vec![target.display().to_string()];
+        artifact.notes.push(
+            "Synced curated mod payload. Windhawk UI import may still be required.".to_string(),
+        );
+        Ok(artifact)
     }
     fn backup(&self, _paths: &AppPaths) -> Result<()> {
         Ok(())
@@ -488,6 +546,131 @@ impl Adapter for WindhawkAdapter {
             "Windhawk not detected. Install from windhawk.org for curated mod management."
                 .to_string()
         })
+    }
+}
+
+fn copy_with_parent(source: &PathBuf, destination: &PathBuf) -> Result<()> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+    fs::copy(source, destination).with_context(|| {
+        format!(
+            "failed to copy {} to {}",
+            source.display(),
+            destination.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn home_dir() -> PathBuf {
+    env::var("USERPROFILE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("C:\\"))
+}
+
+fn locate_rainmeter_exe() -> Option<PathBuf> {
+    [
+        env_path("%PROGRAMFILES%\\Rainmeter\\Rainmeter.exe"),
+        env_path("%PROGRAMFILES(X86)%\\Rainmeter\\Rainmeter.exe"),
+    ]
+    .into_iter()
+    .find(|candidate| candidate.exists())
+}
+
+fn resolve_lively_target(request: &ApplyRequest) -> PathBuf {
+    request
+        .paths
+        .live_adapter_dir("lively")
+        .join("wallpaper.json")
+}
+
+fn resolve_rainmeter_target(request: &ApplyRequest) -> PathBuf {
+    if let Some(path) = &request.config.rainmeter.managed_path {
+        return PathBuf::from(path).join("muks-theme.ini");
+    }
+
+    let default = home_dir()
+        .join("Documents")
+        .join("Rainmeter")
+        .join("Skins")
+        .join("Muks")
+        .join("@Resources")
+        .join("muks-theme.ini");
+
+    if default
+        .parent()
+        .map(|parent| parent.exists())
+        .unwrap_or(false)
+    {
+        default
+    } else {
+        request
+            .paths
+            .live_adapter_dir("rainmeter")
+            .join("muks-theme.ini")
+    }
+}
+
+fn resolve_yasb_targets(request: &ApplyRequest) -> (PathBuf, PathBuf) {
+    let base = if let Some(path) = &request.config.yasb.managed_path {
+        PathBuf::from(path)
+    } else {
+        let default = home_dir().join(".config").join("yasb");
+        if default.exists() {
+            default
+        } else {
+            request.paths.live_adapter_dir("yasb")
+        }
+    };
+    (base.join("config.yaml"), base.join("styles.css"))
+}
+
+fn resolve_komorebi_target(request: &ApplyRequest) -> PathBuf {
+    if let Some(path) = &request.config.komorebi.managed_path {
+        return PathBuf::from(path);
+    }
+
+    let default = home_dir().join("komorebi.json");
+    if default
+        .parent()
+        .map(|parent| parent.exists())
+        .unwrap_or(false)
+    {
+        default
+    } else {
+        request
+            .paths
+            .live_adapter_dir("komorebi")
+            .join("komorebi.json")
+    }
+}
+
+fn resolve_windhawk_target(request: &ApplyRequest) -> PathBuf {
+    if let Some(path) = &request.config.windhawk.managed_path {
+        return PathBuf::from(path).join("managed-mods.toml");
+    }
+
+    let appdata = env::var("APPDATA").unwrap_or_default();
+    let default = PathBuf::from(appdata)
+        .join("Windhawk")
+        .join("Engine")
+        .join("Mods")
+        .join("Muks")
+        .join("managed-mods.toml");
+
+    if default
+        .parent()
+        .map(|parent| parent.exists())
+        .unwrap_or(false)
+    {
+        default
+    } else {
+        request
+            .paths
+            .live_adapter_dir("windhawk")
+            .join("managed-mods.toml")
     }
 }
 
@@ -565,5 +748,7 @@ fn artifact(adapter: &str, files: Vec<PathBuf>) -> GeneratedArtifact {
             .into_iter()
             .map(|file| file.display().to_string())
             .collect(),
+        live_targets: Vec::new(),
+        notes: Vec::new(),
     }
 }

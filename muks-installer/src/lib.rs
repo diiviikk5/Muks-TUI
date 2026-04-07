@@ -2,6 +2,7 @@ use anyhow::Result;
 use muks_adapters::AdapterRegistry;
 use muks_common::{AppPaths, ToolName, command_exists};
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallStep {
@@ -9,6 +10,8 @@ pub struct InstallStep {
     pub installed: bool,
     pub strategy: String,
     pub note: String,
+    pub attempted_install: bool,
+    pub install_succeeded: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,7 +31,7 @@ impl Installer {
         }
     }
 
-    pub fn install_all(&self, paths: &AppPaths) -> Result<InstallReport> {
+    pub fn install_all(&self, paths: &AppPaths, apply: bool) -> Result<InstallReport> {
         let winget_available = command_exists("winget.exe");
         let statuses = self.registry.detect_all(paths)?;
         let mut steps = Vec::new();
@@ -42,7 +45,10 @@ impl Installer {
                 "official-upstream-manual".to_string()
             };
 
-            let note = if status.installed {
+            let mut attempted_install = false;
+            let mut install_succeeded = status.installed;
+
+            let mut note = if status.installed {
                 format!("{} is already installed.", status.metadata.display_name)
             } else {
                 match status.tool {
@@ -65,11 +71,64 @@ impl Installer {
                 }
             };
 
+            if apply && !status.installed {
+                attempted_install = true;
+                if winget_available {
+                    if let Some(winget_id) = winget_package_id(status.tool) {
+                        let result = Command::new("winget")
+                            .args([
+                                "install",
+                                "--id",
+                                winget_id,
+                                "--source",
+                                "winget",
+                                "--accept-source-agreements",
+                                "--accept-package-agreements",
+                                "--silent",
+                                "--disable-interactivity",
+                            ])
+                            .status();
+
+                        match result {
+                            Ok(exit) if exit.success() => {
+                                install_succeeded = true;
+                                note = format!("Installed using winget id `{}`.", winget_id);
+                            }
+                            Ok(exit) => {
+                                install_succeeded = false;
+                                note = format!(
+                                    "winget install failed for `{}` with exit code {:?}. {}",
+                                    winget_id,
+                                    exit.code(),
+                                    note
+                                );
+                            }
+                            Err(error) => {
+                                install_succeeded = false;
+                                note = format!(
+                                    "winget install failed for `{}`: {}. {}",
+                                    winget_id, error, note
+                                );
+                            }
+                        }
+                    } else {
+                        note = format!(
+                            "No winget package id configured for {}. {}",
+                            status.metadata.display_name, note
+                        );
+                    }
+                } else {
+                    note = format!("winget unavailable; install manually. {}", note);
+                }
+            }
+
             steps.push(InstallStep {
                 tool: status.tool.as_str().to_string(),
                 installed: status.installed,
                 strategy,
                 note,
+                attempted_install,
+                install_succeeded,
             });
         }
 
@@ -77,5 +136,15 @@ impl Installer {
             steps,
             winget_available,
         })
+    }
+}
+
+fn winget_package_id(tool: ToolName) -> Option<&'static str> {
+    match tool {
+        ToolName::Lively => Some("rocksdanister.LivelyWallpaper"),
+        ToolName::Rainmeter => Some("Rainmeter.Rainmeter"),
+        ToolName::Yasb => None,
+        ToolName::Komorebi => Some("LGUG2Z.komorebi"),
+        ToolName::Windhawk => None,
     }
 }

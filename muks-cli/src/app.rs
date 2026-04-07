@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Install,
+    Install(InstallCommand),
     Doctor,
     Status,
     Tui,
@@ -36,6 +36,12 @@ enum Commands {
     Backup(BackupCommand),
     Rollback(RollbackCommand),
     Watch(WatchCommand),
+}
+
+#[derive(Args)]
+struct InstallCommand {
+    #[arg(long)]
+    apply: bool,
 }
 
 #[derive(Args)]
@@ -253,14 +259,19 @@ fn run_command(cli: Cli) -> Result<()> {
     let registry = AdapterRegistry::new();
 
     match cli.command {
-        Commands::Install => {
-            let report = Installer::new().install_all(&state.paths)?;
+        Commands::Install(command) => {
+            let report = Installer::new().install_all(&state.paths, command.apply)?;
             println!("Muks install plan");
             println!("winget available: {}", report.winget_available);
             for step in report.steps {
                 println!(
-                    "- {} | installed={} | strategy={} | {}",
-                    step.tool, step.installed, step.strategy, step.note
+                    "- {} | installed={} | strategy={} | attempted_install={} | success={} | {}",
+                    step.tool,
+                    step.installed,
+                    step.strategy,
+                    step.attempted_install,
+                    step.install_succeeded,
+                    step.note
                 );
             }
         }
@@ -449,7 +460,13 @@ fn print_apply_result(message: &str, generated: &[GeneratedArtifact]) {
     for artifact in generated {
         println!("  {}:", artifact.adapter);
         for file in &artifact.files {
-            println!("    {}", file);
+            println!("    generated: {}", file);
+        }
+        for target in &artifact.live_targets {
+            println!("    live: {}", target);
+        }
+        for note in &artifact.notes {
+            println!("    note: {}", note);
         }
     }
 }

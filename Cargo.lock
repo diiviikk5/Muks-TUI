@@ -683,6 +683,7 @@ dependencies = [
  "muks-adapters",
  "muks-common",
  "muks-core",
+ "muks-installer",
  "ratatui",
 ]
 

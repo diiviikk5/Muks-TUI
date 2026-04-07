@@ -6,6 +6,8 @@
     "status": "cargo run -p muks-cli -- status",
     "doctor": "cargo run -p muks-cli -- doctor",
     "tui": "cargo run -p muks-cli -- tui",
-    "shell": "cargo run -p muks-cli --bin mukss"
+    "shell": "cargo run -p muks-cli --bin mukss",
+    "install:plan": "cargo run -p muks-cli -- install",
+    "install:apply": "cargo run -p muks-cli -- install --apply"
   }
 }

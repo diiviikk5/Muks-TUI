@@ -17,4 +17,5 @@ crossterm.workspace = true
 muks-adapters = { path = "../muks-adapters" }
 muks-common = { path = "../muks-common" }
 muks-core = { path = "../muks-core" }
+muks-installer = { path = "../muks-installer" }
 ratatui.workspace = true
