@@ -32,8 +32,8 @@ pub trait Adapter: Send + Sync {
     fn install(&self, paths: &AppPaths) -> Result<String>;
     fn render(&self, request: &ApplyRequest) -> Result<GeneratedArtifact>;
     fn apply(&self, request: &ApplyRequest) -> Result<GeneratedArtifact>;
-    fn backup(&self, paths: &AppPaths) -> Result<()>;
-    fn rollback(&self, paths: &AppPaths) -> Result<()>;
+    fn backup(&self, request: &ApplyRequest) -> Result<()>;
+    fn rollback(&self, request: &ApplyRequest) -> Result<()>;
     fn doctor(&self, paths: &AppPaths) -> Result<String>;
 }
 
@@ -64,19 +64,35 @@ impl AdapterRegistry {
 
     pub fn apply_all(&self, request: &ApplyRequest) -> Result<Vec<GeneratedArtifact>> {
         let mut generated = Vec::new();
-        for adapter in &self.adapters {
-            if let Err(error) = adapter.backup(&request.paths) {
-                if !request.best_effort {
-                    return Err(error).context(format!("backup failed for {}", adapter.tool()));
+        let mut applied_indexes = Vec::new();
+        for (index, adapter) in self.adapters.iter().enumerate() {
+            if !adapter_enabled(adapter.tool(), &request.config) {
+                continue;
+            }
+
+            if let Err(error) = adapter.backup(request) {
+                if request.best_effort {
+                    tracing::warn!(
+                        "best effort backup failed for {}: {}",
+                        adapter.tool(),
+                        error
+                    );
+                    continue;
                 }
+                rollback_applied(&self.adapters, &applied_indexes, request);
+                return Err(error).context(format!("backup failed for {}", adapter.tool()));
             }
 
             match adapter.apply(request) {
-                Ok(artifact) => generated.push(artifact),
+                Ok(artifact) => {
+                    generated.push(artifact);
+                    applied_indexes.push(index);
+                }
                 Err(error) if request.best_effort => {
                     tracing::warn!("best effort apply failed for {}: {}", adapter.tool(), error);
                 }
                 Err(error) => {
+                    rollback_applied(&self.adapters, &applied_indexes, request);
                     return Err(error).context(format!("apply failed for {}", adapter.tool()));
                 }
             }
@@ -87,8 +103,43 @@ impl AdapterRegistry {
     pub fn render_all(&self, request: &ApplyRequest) -> Result<Vec<GeneratedArtifact>> {
         self.adapters
             .iter()
+            .filter(|adapter| adapter_enabled(adapter.tool(), &request.config))
             .map(|adapter| adapter.render(request))
             .collect()
+    }
+
+    pub fn apply_one(&self, tool: &str, request: &ApplyRequest) -> Result<GeneratedArtifact> {
+        let adapter = self
+            .find(tool)
+            .ok_or_else(|| anyhow!("adapter `{}` not found", tool))?;
+
+        if !adapter_enabled(adapter.tool(), &request.config) {
+            return Err(anyhow!("adapter `{}` is disabled in config", tool));
+        }
+
+        if let Err(error) = adapter.backup(request) {
+            if request.best_effort {
+                tracing::warn!(
+                    "best effort backup failed for {}: {}",
+                    adapter.tool(),
+                    error
+                );
+            } else {
+                return Err(error).context(format!("backup failed for {}", adapter.tool()));
+            }
+        }
+
+        match adapter.apply(request) {
+            Ok(artifact) => Ok(artifact),
+            Err(error) if request.best_effort => Err(error).context(format!(
+                "apply failed for {} (best-effort mode still returned error)",
+                adapter.tool()
+            )),
+            Err(error) => {
+                let _ = adapter.rollback(request);
+                Err(error).context(format!("apply failed for {}", adapter.tool()))
+            }
+        }
     }
 
     pub fn list_metadata(&self, paths: &AppPaths) -> Vec<AdapterMetadata> {
@@ -185,11 +236,13 @@ impl Adapter for LivelyAdapter {
             .push("Synced to managed lively payload target.".to_string());
         Ok(artifact)
     }
-    fn backup(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn backup(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_lively_target(request);
+        backup_target("lively", "wallpaper", &target, &request.paths)
     }
-    fn rollback(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn rollback(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_lively_target(request);
+        restore_target("lively", "wallpaper", &target, &request.paths)
     }
     fn doctor(&self, paths: &AppPaths) -> Result<String> {
         let status = self.detect(paths);
@@ -272,11 +325,13 @@ impl Adapter for RainmeterAdapter {
         }
         Ok(artifact)
     }
-    fn backup(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn backup(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_rainmeter_target(request);
+        backup_target("rainmeter", "theme", &target, &request.paths)
     }
-    fn rollback(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn rollback(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_rainmeter_target(request);
+        restore_target("rainmeter", "theme", &target, &request.paths)
     }
     fn doctor(&self, paths: &AppPaths) -> Result<String> {
         let status = self.detect(paths);
@@ -363,11 +418,15 @@ impl Adapter for YasbAdapter {
         }
         Ok(artifact)
     }
-    fn backup(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn backup(&self, request: &ApplyRequest) -> Result<()> {
+        let (target_config, target_styles) = resolve_yasb_targets(request);
+        backup_target("yasb", "config", &target_config, &request.paths)?;
+        backup_target("yasb", "styles", &target_styles, &request.paths)
     }
-    fn rollback(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn rollback(&self, request: &ApplyRequest) -> Result<()> {
+        let (target_config, target_styles) = resolve_yasb_targets(request);
+        restore_target("yasb", "config", &target_config, &request.paths)?;
+        restore_target("yasb", "styles", &target_styles, &request.paths)
     }
     fn doctor(&self, paths: &AppPaths) -> Result<String> {
         let status = self.detect(paths);
@@ -453,11 +512,13 @@ impl Adapter for KomorebiAdapter {
         }
         Ok(artifact)
     }
-    fn backup(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn backup(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_komorebi_target(request);
+        backup_target("komorebi", "config", &target, &request.paths)
     }
-    fn rollback(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn rollback(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_komorebi_target(request);
+        restore_target("komorebi", "config", &target, &request.paths)
     }
     fn doctor(&self, paths: &AppPaths) -> Result<String> {
         let status = self.detect(paths);
@@ -532,11 +593,13 @@ impl Adapter for WindhawkAdapter {
         );
         Ok(artifact)
     }
-    fn backup(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn backup(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_windhawk_target(request);
+        backup_target("windhawk", "mods", &target, &request.paths)
     }
-    fn rollback(&self, _paths: &AppPaths) -> Result<()> {
-        Ok(())
+    fn rollback(&self, request: &ApplyRequest) -> Result<()> {
+        let target = resolve_windhawk_target(request);
+        restore_target("windhawk", "mods", &target, &request.paths)
     }
     fn doctor(&self, paths: &AppPaths) -> Result<String> {
         let status = self.detect(paths);
@@ -672,6 +735,80 @@ fn resolve_windhawk_target(request: &ApplyRequest) -> PathBuf {
             .live_adapter_dir("windhawk")
             .join("managed-mods.toml")
     }
+}
+
+fn adapter_enabled(tool: ToolName, config: &AppConfig) -> bool {
+    match tool {
+        ToolName::Lively => true,
+        ToolName::Rainmeter => config.rainmeter.enabled,
+        ToolName::Yasb => config.yasb.enabled,
+        ToolName::Komorebi => config.komorebi.enabled,
+        ToolName::Windhawk => config.windhawk.enabled,
+    }
+}
+
+fn rollback_applied(
+    adapters: &[Box<dyn Adapter>],
+    applied_indexes: &[usize],
+    request: &ApplyRequest,
+) {
+    for index in applied_indexes.iter().rev() {
+        if let Some(adapter) = adapters.get(*index) {
+            if let Err(error) = adapter.rollback(request) {
+                tracing::error!(
+                    "rollback failed for {} while handling apply error: {}",
+                    adapter.tool(),
+                    error
+                );
+            }
+        }
+    }
+}
+
+fn backup_target(adapter: &str, key: &str, target: &PathBuf, paths: &AppPaths) -> Result<()> {
+    let (backup_file, marker_file) = backup_entry_paths(adapter, key, paths);
+    if let Some(parent) = backup_file.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+
+    if target.exists() {
+        copy_with_parent(target, &backup_file)?;
+        if marker_file.exists() {
+            fs::remove_file(&marker_file)
+                .with_context(|| format!("failed to remove {}", marker_file.display()))?;
+        }
+    } else {
+        fs::write(&marker_file, b"missing")
+            .with_context(|| format!("failed to write {}", marker_file.display()))?;
+        if backup_file.exists() {
+            fs::remove_file(&backup_file)
+                .with_context(|| format!("failed to remove {}", backup_file.display()))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn restore_target(adapter: &str, key: &str, target: &PathBuf, paths: &AppPaths) -> Result<()> {
+    let (backup_file, marker_file) = backup_entry_paths(adapter, key, paths);
+
+    if backup_file.exists() {
+        copy_with_parent(&backup_file, target)?;
+    } else if marker_file.exists() && target.exists() {
+        fs::remove_file(target)
+            .with_context(|| format!("failed to remove {}", target.display()))?;
+    }
+
+    Ok(())
+}
+
+fn backup_entry_paths(adapter: &str, key: &str, paths: &AppPaths) -> (PathBuf, PathBuf) {
+    let base = paths.backup_adapter_dir(adapter);
+    (
+        base.join(format!("{}.bak", key)),
+        base.join(format!("{}.missing", key)),
+    )
 }
 
 fn env_path(template: &str) -> PathBuf {

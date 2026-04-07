@@ -1,12 +1,13 @@
 use anyhow::{Result, anyhow};
 use clap::{Args, Parser, Subcommand};
 use muks_adapters::{AdapterRegistry, ApplyRequest, GeneratedArtifact};
-use muks_common::init_logging;
+use muks_common::{command_exists, init_logging};
 use muks_core::{MuksState, theme::derive_tokens};
 use muks_installer::Installer;
 use muks_syncd::SyncDaemon;
 use std::ffi::OsString;
 use std::io::{self, Write};
+use std::process::Command;
 
 #[derive(Parser)]
 #[command(
@@ -312,13 +313,8 @@ fn run_command(cli: Cli) -> Result<()> {
         }
         Commands::Wallpaper(command) => match command.command {
             WallpaperSubcommand::Set { source } => {
-                let config = state.set_wallpaper(&source)?;
-                let request = ApplyRequest {
-                    tokens: derive_tokens(&config),
-                    config,
-                    paths: state.paths.clone(),
-                    best_effort: false,
-                };
+                state.set_wallpaper(&source)?;
+                let request = build_request(&state, false)?;
                 let generated = registry.apply_all(&request)?;
                 print_apply_result("Wallpaper set and synced.", &generated);
             }
@@ -328,76 +324,95 @@ fn run_command(cli: Cli) -> Result<()> {
                 preset,
                 best_effort,
             } => {
-                let config = state.set_theme_preset(&preset)?;
                 let snapshot = state.create_backup("theme-apply")?;
-                let request = ApplyRequest {
-                    tokens: derive_tokens(&config),
-                    config,
-                    paths: state.paths.clone(),
-                    best_effort,
-                };
+                state.set_theme_preset(&preset)?;
+                let request = build_request(&state, best_effort)?;
                 let generated = registry.apply_all(&request)?;
                 println!("Snapshot: {}", snapshot.id);
                 print_apply_result("Theme synced.", &generated);
             }
             ThemeSubcommand::Sync { best_effort } => {
-                let config = state.config()?;
-                let request = ApplyRequest {
-                    tokens: derive_tokens(&config),
-                    config,
-                    paths: state.paths.clone(),
-                    best_effort,
-                };
+                let request = build_request(&state, best_effort)?;
                 let generated = registry.apply_all(&request)?;
                 print_apply_result("Theme sync complete.", &generated);
             }
         },
         Commands::Bar(command) => match command.command {
             ReloadSubcommand::Reload => {
-                let config = state.config()?;
-                let request = ApplyRequest {
-                    tokens: derive_tokens(&config),
-                    config,
-                    paths: state.paths.clone(),
-                    best_effort: true,
-                };
-                let generated = registry.render_all(&request)?;
-                print_apply_result("Bar-facing output regenerated.", &generated);
+                let request = build_request(&state, true)?;
+                let artifact = registry.apply_one("yasb", &request)?;
+                print_apply_result("YASB bar config synced.", &[artifact]);
             }
         },
         Commands::Widgets(command) => match command.command {
             ReloadSubcommand::Reload => {
-                let config = state.config()?;
-                let request = ApplyRequest {
-                    tokens: derive_tokens(&config),
-                    config,
-                    paths: state.paths.clone(),
-                    best_effort: true,
-                };
-                let generated = registry.render_all(&request)?;
-                print_apply_result("Widget-facing output regenerated.", &generated);
+                let request = build_request(&state, true)?;
+                let artifact = registry.apply_one("rainmeter", &request)?;
+                print_apply_result("Rainmeter widgets synced.", &[artifact]);
             }
         },
         Commands::Tile(command) => match command.command {
             TileSubcommand::Start => {
-                println!("Komorebi start will be driven through the managed adapter path.")
+                let request = build_request(&state, true)?;
+                let artifact = registry.apply_one("komorebi", &request)?;
+                print_apply_result("Komorebi config synced.", &[artifact]);
+                if command_exists("komorebic.exe") {
+                    let result = run_process("komorebic", &["start"])?;
+                    println!("komorebic start: {}", result);
+                } else {
+                    println!(
+                        "komorebic.exe not found on PATH; config was still generated and synced."
+                    );
+                }
             }
             TileSubcommand::Stop => {
-                println!("Komorebi stop will be driven through the managed adapter path.")
+                if command_exists("komorebic.exe") {
+                    let result = run_process("komorebic", &["stop"])?;
+                    println!("komorebic stop: {}", result);
+                } else {
+                    println!("komorebic.exe not found on PATH.");
+                }
             }
-            TileSubcommand::Workspace { id } => println!("Workspace switch requested for {}", id),
+            TileSubcommand::Workspace { id } => {
+                if command_exists("komorebic.exe") {
+                    let attempts = [
+                        vec!["focus-workspace".to_string(), id.clone()],
+                        vec!["workspace".to_string(), id.clone()],
+                    ];
+                    let mut executed = false;
+
+                    for args in attempts {
+                        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                        let result = run_process("komorebic", &refs)?;
+                        if result == "ok" {
+                            println!("Switched to workspace {}", id);
+                            executed = true;
+                            break;
+                        }
+                    }
+
+                    if !executed {
+                        println!(
+                            "Could not switch workspace with known komorebic arguments. Try `komorebic focus-workspace {}` manually.",
+                            id
+                        );
+                    }
+                } else {
+                    println!("komorebic.exe not found on PATH.");
+                }
+            }
         },
         Commands::Mod(command) => match command.command {
             ModSubcommand::Apply { profile } => {
-                let config = state.set_theme_preset(&profile)?;
+                let config = state.set_windhawk_profile(&profile)?;
                 let request = ApplyRequest {
                     tokens: derive_tokens(&config),
                     config,
                     paths: state.paths.clone(),
                     best_effort: true,
                 };
-                let generated = registry.apply_all(&request)?;
-                print_apply_result("Curated mod profile rendered.", &generated);
+                let artifact = registry.apply_one("windhawk", &request)?;
+                print_apply_result("Curated Windhawk profile synced.", &[artifact]);
             }
         },
         Commands::Adapter(command) => match command.command {
@@ -427,7 +442,10 @@ fn run_command(cli: Cli) -> Result<()> {
             }
             RiceSubcommand::Load { snapshot } => {
                 let restored = state.restore_backup(&snapshot)?;
+                let request = build_request(&state, true)?;
+                let generated = registry.apply_all(&request)?;
                 println!("Loaded rice snapshot `{}`", restored.id);
+                print_apply_result("Re-applied adapters from loaded snapshot.", &generated);
             }
         },
         Commands::Backup(command) => match command.command {
@@ -438,7 +456,10 @@ fn run_command(cli: Cli) -> Result<()> {
         },
         Commands::Rollback(command) => {
             let restored = state.restore_backup(&command.snapshot)?;
+            let request = build_request(&state, true)?;
+            let generated = registry.apply_all(&request)?;
             println!("Rolled back to snapshot {}", restored.id);
+            print_apply_result("Re-applied adapters after rollback.", &generated);
         }
         Commands::Watch(command) => {
             let report = SyncDaemon::new()?.watch(
@@ -453,6 +474,25 @@ fn run_command(cli: Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn build_request(state: &MuksState, best_effort: bool) -> Result<ApplyRequest> {
+    let config = state.config()?;
+    Ok(ApplyRequest {
+        tokens: derive_tokens(&config),
+        config,
+        paths: state.paths.clone(),
+        best_effort,
+    })
+}
+
+fn run_process(program: &str, args: &[&str]) -> Result<String> {
+    let status = Command::new(program).args(args).status()?;
+    Ok(if status.success() {
+        "ok".to_string()
+    } else {
+        format!("failed (exit {:?})", status.code())
+    })
 }
 
 fn print_apply_result(message: &str, generated: &[GeneratedArtifact]) {

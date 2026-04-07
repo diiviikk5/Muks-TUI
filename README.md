@@ -16,11 +16,12 @@ It installs, detects, themes, and orchestrates the best existing desktop customi
 - adapter registry for all five engines
 - install planning and health detection
 - theme token generation and output rendering
-- snapshot and rollback primitives
+- snapshot and rollback primitives with adapter backup/restore
 - `muks` CLI
 - `muks tui` terminal UI
 - `mukss` interactive command shell with a branded startup banner
 - live target sync for all adapters into managed paths under `%USERPROFILE%\\.muks\\live` (or detected tool paths)
+- adapter enable flags respected during apply/render pipelines
 
 ## Quick start
 
@@ -39,8 +40,12 @@ Inside `muks tui`:
 - `r` refresh adapter + profile state
 - `d` doctor summary in activity log
 - `i` generate install plan
+- `I` attempt installer execution (`winget` + official guidance fallback)
 - `a` apply full adapter sync (all five adapters)
+- `p` apply selected adapter only
 - `x` run reinstall guidance for selected adapter
+- `s` create snapshot
+- `u` rollback latest snapshot and re-apply adapters
 - `j/k` or arrow keys move adapter selection
 - `q` quit
 
@@ -49,6 +54,10 @@ Inside `muks tui`:
 ```powershell
 cargo run -p muks-cli -- install
 cargo run -p muks-cli -- install --apply
+cargo run -p muks-cli -- bar reload
+cargo run -p muks-cli -- widgets reload
+cargo run -p muks-cli -- tile start
+cargo run -p muks-cli -- mod apply curated
 ```
 
 ## Local install

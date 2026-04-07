@@ -84,6 +84,13 @@ impl MuksState {
         Ok(config)
     }
 
+    pub fn set_windhawk_profile(&self, profile: &str) -> Result<AppConfig> {
+        let mut config = self.config()?;
+        config.windhawk.profile = profile.to_string();
+        self.save_config(&config)?;
+        Ok(config)
+    }
+
     pub fn create_backup(&self, label: &str) -> Result<SnapshotManifest> {
         snapshot::create_snapshot(
             &self.paths.snapshots,

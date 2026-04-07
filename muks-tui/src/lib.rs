@@ -43,7 +43,11 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Dashboar
                     KeyCode::Char('r') => app.refresh()?,
                     KeyCode::Char('d') => app.doctor(),
                     KeyCode::Char('i') => app.install_plan()?,
+                    KeyCode::Char('I') => app.install_apply()?,
                     KeyCode::Char('a') => app.apply_sync(true)?,
+                    KeyCode::Char('p') => app.apply_selected()?,
+                    KeyCode::Char('s') => app.save_snapshot()?,
+                    KeyCode::Char('u') => app.rollback_latest()?,
                     KeyCode::Char('x') => app.reinstall_selected()?,
                     KeyCode::Down | KeyCode::Char('j') => app.select_next(),
                     KeyCode::Up | KeyCode::Char('k') => app.select_prev(),
@@ -110,6 +114,26 @@ impl Dashboard {
         Ok(())
     }
 
+    fn install_apply(&mut self) -> Result<()> {
+        let report = Installer::new().install_all(&self.state.paths, true)?;
+        self.log(format!(
+            "Install apply executed. winget available: {}",
+            report.winget_available
+        ));
+        for step in report.steps {
+            self.log(format!(
+                "[{}] installed={} attempted={} success={} {}",
+                step.tool,
+                step.installed,
+                step.attempted_install,
+                step.install_succeeded,
+                step.note
+            ));
+        }
+        self.refresh()?;
+        Ok(())
+    }
+
     fn doctor(&mut self) {
         let lines: Vec<String> = self
             .adapters
@@ -154,6 +178,28 @@ impl Dashboard {
         Ok(())
     }
 
+    fn apply_selected(&mut self) -> Result<()> {
+        let Some(tool) = self.selected_tool() else {
+            return Ok(());
+        };
+        let config = self.state.config()?;
+        let request = ApplyRequest {
+            tokens: derive_tokens(&config),
+            config,
+            paths: self.state.paths.clone(),
+            best_effort: true,
+        };
+        let artifact = self.registry.apply_one(tool.as_str(), &request)?;
+        self.log(format!(
+            "{} synced. generated={} live_targets={}",
+            tool.display_name(),
+            artifact.files.len(),
+            artifact.live_targets.len()
+        ));
+        self.refresh()?;
+        Ok(())
+    }
+
     fn reinstall_selected(&mut self) -> Result<()> {
         let Some(adapter) = self.adapters.get(self.selected) else {
             return Ok(());
@@ -164,6 +210,38 @@ impl Dashboard {
             "{} reinstall: {}",
             adapter.metadata.display_name, note
         ));
+        Ok(())
+    }
+
+    fn save_snapshot(&mut self) -> Result<()> {
+        let snapshot = self.state.create_backup("tui-manual")?;
+        self.log(format!("Snapshot created: {}", snapshot.id));
+        self.refresh()?;
+        Ok(())
+    }
+
+    fn rollback_latest(&mut self) -> Result<()> {
+        let Some(snapshot) = self.state.list_snapshots()?.into_iter().next() else {
+            self.log("No snapshot available to rollback.");
+            return Ok(());
+        };
+
+        self.state.restore_backup(&snapshot.id)?;
+        self.log(format!("Restored snapshot: {}", snapshot.id));
+
+        let config = self.state.config()?;
+        let request = ApplyRequest {
+            tokens: derive_tokens(&config),
+            config,
+            paths: self.state.paths.clone(),
+            best_effort: true,
+        };
+        let artifacts = self.registry.apply_all(&request)?;
+        self.log(format!(
+            "Re-applied {} adapters after rollback.",
+            artifacts.len()
+        ));
+        self.refresh()?;
         Ok(())
     }
 
@@ -275,7 +353,7 @@ fn draw(frame: &mut Frame<'_>, app: &Dashboard) {
         .map(|tool| tool.display_name())
         .unwrap_or("None");
     let side = Paragraph::new(format!(
-        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  i  install plan\n  a  apply full sync\n  x  reinstall selected\n  q  quit",
+        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  i  install plan\n  I  install apply\n  a  apply full sync\n  p  apply selected\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
         selected_name, app.snapshot_count
     ))
     .block(Block::default().title("Actions").borders(Borders::ALL));
