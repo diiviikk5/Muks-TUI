@@ -6,7 +6,7 @@ use crossterm::{
 };
 use muks_adapters::{AdapterRegistry, ApplyRequest};
 use muks_common::{AdapterStatus, ToolName};
-use muks_core::{MuksState, StatusReport, theme::derive_tokens};
+use muks_core::{AppConfig, MuksState, StatusReport, theme::derive_tokens};
 use muks_installer::Installer;
 use ratatui::{
     Terminal,
@@ -52,6 +52,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Dashboar
                     KeyCode::Char('4') => app.apply_preset("cyber")?,
                     KeyCode::Char('5') => app.apply_preset("nebula")?,
                     KeyCode::Char('p') => app.apply_selected()?,
+                    KeyCode::Char('e') => app.toggle_selected_adapter_enabled()?,
                     KeyCode::Char('s') => app.save_snapshot()?,
                     KeyCode::Char('u') => app.rollback_latest()?,
                     KeyCode::Char('x') => app.reinstall_selected()?,
@@ -68,6 +69,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Dashboar
 struct Dashboard {
     state: MuksState,
     registry: AdapterRegistry,
+    config: AppConfig,
     summary: StatusReport,
     adapters: Vec<AdapterStatus>,
     snapshot_count: usize,
@@ -79,6 +81,7 @@ impl Dashboard {
     fn new() -> Result<Self> {
         let state = MuksState::new()?;
         let registry = AdapterRegistry::new();
+        let config = state.config()?;
         let summary = state.status_report()?;
         let adapters = registry.detect_all(&state.paths)?;
         let snapshot_count = state.list_snapshots()?.len();
@@ -86,6 +89,7 @@ impl Dashboard {
         Ok(Self {
             state,
             registry,
+            config,
             summary,
             adapters,
             snapshot_count,
@@ -95,6 +99,7 @@ impl Dashboard {
     }
 
     fn refresh(&mut self) -> Result<()> {
+        self.config = self.state.config()?;
         self.summary = self.state.status_report()?;
         self.adapters = self.registry.detect_all(&self.state.paths)?;
         self.snapshot_count = self.state.list_snapshots()?.len();
@@ -234,6 +239,28 @@ impl Dashboard {
         Ok(())
     }
 
+    fn toggle_selected_adapter_enabled(&mut self) -> Result<()> {
+        let Some(tool) = self.selected_tool() else {
+            return Ok(());
+        };
+
+        if tool == ToolName::Lively {
+            self.log("Lively is controlled by wallpaper config and is always active.");
+            return Ok(());
+        }
+
+        let currently_enabled = self.tool_enabled(tool);
+        self.state
+            .configure_adapter(tool.as_str(), Some(!currently_enabled), None, None, false)?;
+        self.log(format!(
+            "{} enabled set to {}",
+            tool.display_name(),
+            !currently_enabled
+        ));
+        self.refresh()?;
+        Ok(())
+    }
+
     fn reinstall_selected(&mut self) -> Result<()> {
         let Some(adapter) = self.adapters.get(self.selected) else {
             return Ok(());
@@ -301,6 +328,16 @@ impl Dashboard {
         self.adapters.get(self.selected).map(|adapter| adapter.tool)
     }
 
+    fn tool_enabled(&self, tool: ToolName) -> bool {
+        match tool {
+            ToolName::Lively => true,
+            ToolName::Rainmeter => self.config.rainmeter.enabled,
+            ToolName::Yasb => self.config.yasb.enabled,
+            ToolName::Komorebi => self.config.komorebi.enabled,
+            ToolName::Windhawk => self.config.windhawk.enabled,
+        }
+    }
+
     fn log<S: Into<String>>(&mut self, message: S) {
         self.logs.push(message.into());
         if self.logs.len() > 14 {
@@ -366,8 +403,12 @@ fn draw(frame: &mut Frame<'_>, app: &Dashboard) {
         .iter()
         .map(|adapter| {
             ListItem::new(format!(
-                "{} | installed={} | {:?}",
-                adapter.metadata.display_name, adapter.installed, adapter.health
+                "{} | enabled={} | installed={} | version={} | {:?}",
+                adapter.metadata.display_name,
+                app.tool_enabled(adapter.tool),
+                adapter.installed,
+                adapter.version.as_deref().unwrap_or("unknown"),
+                adapter.health
             ))
         })
         .collect();
@@ -387,7 +428,7 @@ fn draw(frame: &mut Frame<'_>, app: &Dashboard) {
         .map(|tool| tool.display_name())
         .unwrap_or("None");
     let side = Paragraph::new(format!(
-        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  f  doctor repair\n  i  install plan\n  I  install apply\n  a  apply full sync\n  1-5 apply preset\n  p  apply selected\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
+        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  f  doctor repair\n  i  install plan\n  I  install apply\n  a  apply full sync\n  1-5 apply preset\n  p  apply selected\n  e  toggle selected adapter\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
         selected_name, app.snapshot_count
     ))
     .block(Block::default().title("Actions").borders(Borders::ALL));

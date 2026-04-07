@@ -49,6 +49,7 @@ Inside `muks tui`:
 - `a` apply full adapter sync (all five adapters)
 - `1-5` quick-apply built-in presets (`graphite`, `forest`, `rose`, `cyber`, `nebula`)
 - `p` apply selected adapter only
+- `e` toggle selected adapter enabled/disabled
 - `x` run reinstall guidance for selected adapter
 - `s` create snapshot
 - `u` rollback latest snapshot and re-apply adapters
@@ -65,6 +66,7 @@ cargo run -p muks-cli -- widgets reload
 cargo run -p muks-cli -- tile start
 cargo run -p muks-cli -- mod apply curated
 cargo run -p muks-cli -- watch --iterations 100 --interval-ms 500
+cargo run -p muks-cli -- adapter configure yasb --enabled false
 ```
 
 ## Local install

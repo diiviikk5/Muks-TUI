@@ -147,6 +147,33 @@ impl MuksState {
         Ok(config)
     }
 
+    pub fn configure_adapter(
+        &self,
+        name: &str,
+        enabled: Option<bool>,
+        profile: Option<String>,
+        managed_path: Option<String>,
+        clear_managed_path: bool,
+    ) -> Result<AppConfig> {
+        let mut config = self.config()?;
+        let tool = adapter_config_mut(&mut config, name)?;
+
+        if let Some(enabled) = enabled {
+            tool.enabled = enabled;
+        }
+        if let Some(profile) = profile {
+            tool.profile = profile;
+        }
+        if let Some(path) = managed_path {
+            tool.managed_path = Some(path);
+        } else if clear_managed_path {
+            tool.managed_path = None;
+        }
+
+        self.save_config(&config)?;
+        Ok(config)
+    }
+
     pub fn create_backup(&self, label: &str) -> Result<SnapshotManifest> {
         snapshot::create_snapshot(
             &self.paths.snapshots,
@@ -283,6 +310,22 @@ fn apply_tool_preset(tool: &mut crate::config::ToolConfig, preset: Option<Preset
     }
     if let Some(path) = preset.managed_path {
         tool.managed_path = Some(path);
+    }
+}
+
+fn adapter_config_mut<'a>(
+    config: &'a mut AppConfig,
+    name: &str,
+) -> Result<&'a mut crate::config::ToolConfig> {
+    match name.to_ascii_lowercase().as_str() {
+        "rainmeter" => Ok(&mut config.rainmeter),
+        "yasb" => Ok(&mut config.yasb),
+        "komorebi" => Ok(&mut config.komorebi),
+        "windhawk" => Ok(&mut config.windhawk),
+        "lively" => {
+            anyhow::bail!("lively is controlled through [wallpaper], not adapter tool config")
+        }
+        _ => anyhow::bail!("unknown adapter `{}`", name),
     }
 }
 

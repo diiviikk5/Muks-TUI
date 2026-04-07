@@ -127,8 +127,23 @@ struct AdapterCommand {
 #[derive(Subcommand)]
 enum AdapterSubcommand {
     List,
-    Status { name: String },
-    Reinstall { name: String },
+    Status {
+        name: String,
+    },
+    Reinstall {
+        name: String,
+    },
+    Configure {
+        name: String,
+        #[arg(long)]
+        enabled: Option<bool>,
+        #[arg(long)]
+        profile: Option<String>,
+        #[arg(long)]
+        managed_path: Option<String>,
+        #[arg(long)]
+        clear_managed_path: bool,
+    },
 }
 
 #[derive(Args)]
@@ -292,6 +307,7 @@ fn run_command(cli: Cli) -> Result<()> {
         }
         Commands::Status => {
             let report = state.status_report()?;
+            let config = state.config()?;
             let adapters = registry.detect_all(&state.paths)?;
             println!("Profile: {}", report.profile_name);
             println!("Preset: {}", report.preset);
@@ -301,8 +317,9 @@ fn run_command(cli: Cli) -> Result<()> {
             println!("Adapters:");
             for adapter in adapters {
                 println!(
-                    "  - {} | installed={} | version={} | {:?} | {}",
+                    "  - {} | enabled={} | installed={} | version={} | {:?} | {}",
                     adapter.metadata.display_name,
+                    is_adapter_enabled(&config, adapter.tool),
                     adapter.installed,
                     adapter.version.as_deref().unwrap_or("unknown"),
                     adapter.health,
@@ -442,6 +459,56 @@ fn run_command(cli: Cli) -> Result<()> {
             AdapterSubcommand::Reinstall { name } => {
                 println!("{}", registry.reinstall(&name, &state.paths)?);
             }
+            AdapterSubcommand::Configure {
+                name,
+                enabled,
+                profile,
+                managed_path,
+                clear_managed_path,
+            } => {
+                if enabled.is_none()
+                    && profile.is_none()
+                    && managed_path.is_none()
+                    && !clear_managed_path
+                {
+                    return Err(anyhow!(
+                        "no change requested; pass --enabled, --profile, --managed-path, or --clear-managed-path"
+                    ));
+                }
+
+                let updated = state.configure_adapter(
+                    &name,
+                    enabled,
+                    profile,
+                    managed_path,
+                    clear_managed_path,
+                )?;
+                println!("Updated adapter `{}` configuration.", name);
+                println!(
+                    "  rainmeter: enabled={} profile={} managed_path={}",
+                    updated.rainmeter.enabled,
+                    updated.rainmeter.profile,
+                    updated.rainmeter.managed_path.as_deref().unwrap_or("none")
+                );
+                println!(
+                    "  yasb: enabled={} profile={} managed_path={}",
+                    updated.yasb.enabled,
+                    updated.yasb.profile,
+                    updated.yasb.managed_path.as_deref().unwrap_or("none")
+                );
+                println!(
+                    "  komorebi: enabled={} profile={} managed_path={}",
+                    updated.komorebi.enabled,
+                    updated.komorebi.profile,
+                    updated.komorebi.managed_path.as_deref().unwrap_or("none")
+                );
+                println!(
+                    "  windhawk: enabled={} profile={} managed_path={}",
+                    updated.windhawk.enabled,
+                    updated.windhawk.profile,
+                    updated.windhawk.managed_path.as_deref().unwrap_or("none")
+                );
+            }
         },
         Commands::Rice(command) => match command.command {
             RiceSubcommand::Save { name } => {
@@ -577,6 +644,16 @@ fn run_process(program: &str, args: &[&str]) -> Result<String> {
     })
 }
 
+fn is_adapter_enabled(config: &muks_core::AppConfig, tool: muks_common::ToolName) -> bool {
+    match tool {
+        muks_common::ToolName::Lively => true,
+        muks_common::ToolName::Rainmeter => config.rainmeter.enabled,
+        muks_common::ToolName::Yasb => config.yasb.enabled,
+        muks_common::ToolName::Komorebi => config.komorebi.enabled,
+        muks_common::ToolName::Windhawk => config.windhawk.enabled,
+    }
+}
+
 fn print_apply_result(message: &str, generated: &[GeneratedArtifact]) {
     println!("{}", message);
     for artifact in generated {
@@ -601,6 +678,7 @@ fn print_shell_help() {
     println!("  theme apply <preset> --best-effort");
     println!("  wallpaper set <name|path|url>");
     println!("  adapter list");
+    println!("  adapter configure yasb --enabled false");
     println!("  backup create");
     println!("  rice save <name>");
     println!("  rice load <snapshot-id>");
