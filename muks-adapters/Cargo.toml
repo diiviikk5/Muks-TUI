@@ -1,0 +1,16 @@
+[package]
+name = "muks-adapters"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+muks-common = { path = "../muks-common" }
+muks-core = { path = "../muks-core" }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

@@ -1,0 +1,32 @@
+[package]
+name = "muks-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+default-run = "muks"
+
+[[bin]]
+name = "muks"
+path = "src/main.rs"
+
+[lib]
+name = "muks_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mukss"
+path = "src/mukss.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+muks-adapters = { path = "../muks-adapters" }
+muks-common = { path = "../muks-common" }
+muks-core = { path = "../muks-core" }
+muks-installer = { path = "../muks-installer" }
+muks-syncd = { path = "../muks-syncd" }
+muks-tui = { path = "../muks-tui" }
+shlex.workspace = true

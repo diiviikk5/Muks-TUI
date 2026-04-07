@@ -1,0 +1,20 @@
+[package]
+name = "muks-tui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lib]
+name = "muks_tui"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+crossterm.workspace = true
+muks-adapters = { path = "../muks-adapters" }
+muks-common = { path = "../muks-common" }
+muks-core = { path = "../muks-core" }
+ratatui.workspace = true

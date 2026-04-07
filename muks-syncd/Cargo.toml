@@ -1,0 +1,16 @@
+[package]
+name = "muks-syncd"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+muks-adapters = { path = "../muks-adapters" }
+muks-common = { path = "../muks-common" }
+muks-core = { path = "../muks-core" }
+serde.workspace = true
+tracing.workspace = true

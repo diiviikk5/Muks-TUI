@@ -1,0 +1,11 @@
+{
+  "name": "muks-workspace",
+  "private": true,
+  "scripts": {
+    "build": "cargo build -p muks-cli --release",
+    "status": "cargo run -p muks-cli -- status",
+    "doctor": "cargo run -p muks-cli -- doctor",
+    "tui": "cargo run -p muks-cli -- tui",
+    "shell": "cargo run -p muks-cli --bin mukss"
+  }
+}
