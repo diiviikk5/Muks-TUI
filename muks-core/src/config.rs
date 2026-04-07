@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppConfig {
     pub profile: ProfileConfig,
     pub wallpaper: WallpaperConfig,
@@ -37,6 +38,7 @@ impl Default for AppConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ProfileConfig {
     pub name: String,
     pub preset: String,
@@ -54,6 +56,7 @@ impl Default for ProfileConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct WallpaperConfig {
     pub current: String,
     pub source_type: String,
@@ -73,11 +76,17 @@ impl Default for WallpaperConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ThemeConfig {
     pub preset: String,
     pub accent_mode: String,
     pub sync_all_adapters: bool,
     pub reduced_motion: bool,
+    pub accent_override: Option<String>,
+    pub accent_soft_override: Option<String>,
+    pub background_override: Option<String>,
+    pub surface_override: Option<String>,
+    pub text_override: Option<String>,
 }
 
 impl Default for ThemeConfig {
@@ -87,11 +96,17 @@ impl Default for ThemeConfig {
             accent_mode: "palette".to_string(),
             sync_all_adapters: true,
             reduced_motion: false,
+            accent_override: None,
+            accent_soft_override: None,
+            background_override: None,
+            surface_override: None,
+            text_override: None,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ToolConfig {
     pub enabled: bool,
     pub profile: String,
@@ -108,7 +123,14 @@ impl ToolConfig {
     }
 }
 
+impl Default for ToolConfig {
+    fn default() -> Self {
+        Self::enabled("default")
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AdaptersConfig {
     pub auto_detect: bool,
     pub strict_verification: bool,
@@ -126,6 +148,7 @@ impl Default for AdaptersConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SyncConfig {
     pub watch_enabled: bool,
     pub debounce_ms: u64,
@@ -143,6 +166,7 @@ impl Default for SyncConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct InstallConfig {
     pub source_policy: String,
     pub prefer_winget: bool,
@@ -160,6 +184,7 @@ impl Default for InstallConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BackupConfig {
     pub auto_snapshot_before_apply: bool,
     pub keep_last: usize,

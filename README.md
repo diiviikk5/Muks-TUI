@@ -22,6 +22,7 @@ It installs, detects, themes, and orchestrates the best existing desktop customi
 - `mukss` interactive command shell with a branded startup banner
 - live target sync for all adapters into managed paths under `%USERPROFILE%\\.muks\\live` (or detected tool paths)
 - adapter enable flags respected during apply/render pipelines
+- preset files in `%USERPROFILE%\\.muks\\presets\\*.toml` (graphite, forest, rose, cyber, nebula)
 
 ## Quick start
 
@@ -32,6 +33,7 @@ cargo run -p muks-cli -- doctor --repair
 cargo run -p muks-cli -- tui
 cargo run -p muks-cli --bin mukss
 cargo run -p muks-cli -- theme apply graphite --best-effort
+cargo run -p muks-cli -- theme apply cyber --best-effort
 ```
 
 ## TUI controls
@@ -44,6 +46,7 @@ Inside `muks tui`:
 - `i` generate install plan
 - `I` attempt installer execution (`winget` + official guidance fallback)
 - `a` apply full adapter sync (all five adapters)
+- `1-5` quick-apply built-in presets (`graphite`, `forest`, `rose`, `cyber`, `nebula`)
 - `p` apply selected adapter only
 - `x` run reinstall guidance for selected adapter
 - `s` create snapshot

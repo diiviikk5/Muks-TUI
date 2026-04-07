@@ -46,6 +46,11 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Dashboar
                     KeyCode::Char('i') => app.install_plan()?,
                     KeyCode::Char('I') => app.install_apply()?,
                     KeyCode::Char('a') => app.apply_sync(true)?,
+                    KeyCode::Char('1') => app.apply_preset("graphite")?,
+                    KeyCode::Char('2') => app.apply_preset("forest")?,
+                    KeyCode::Char('3') => app.apply_preset("rose")?,
+                    KeyCode::Char('4') => app.apply_preset("cyber")?,
+                    KeyCode::Char('5') => app.apply_preset("nebula")?,
                     KeyCode::Char('p') => app.apply_selected()?,
                     KeyCode::Char('s') => app.save_snapshot()?,
                     KeyCode::Char('u') => app.rollback_latest()?,
@@ -194,6 +199,12 @@ impl Dashboard {
         }
         self.refresh()?;
         Ok(())
+    }
+
+    fn apply_preset(&mut self, preset: &str) -> Result<()> {
+        self.state.set_theme_preset(preset)?;
+        self.log(format!("Preset selected: {}", preset));
+        self.apply_sync(true)
     }
 
     fn apply_selected(&mut self) -> Result<()> {
@@ -371,7 +382,7 @@ fn draw(frame: &mut Frame<'_>, app: &Dashboard) {
         .map(|tool| tool.display_name())
         .unwrap_or("None");
     let side = Paragraph::new(format!(
-        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  f  doctor repair\n  i  install plan\n  I  install apply\n  a  apply full sync\n  p  apply selected\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
+        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  f  doctor repair\n  i  install plan\n  I  install apply\n  a  apply full sync\n  1-5 apply preset\n  p  apply selected\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
         selected_name, app.snapshot_count
     ))
     .block(Block::default().title("Actions").borders(Borders::ALL));
