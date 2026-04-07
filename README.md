@@ -16,6 +16,7 @@ It installs, detects, themes, and orchestrates the best existing desktop customi
 - adapter registry for all five engines
 - install planning and health detection
 - install planning persists JSON reports at `%USERPROFILE%\\.muks\\logs\\install-report.json`
+- `muks install --apply` now attempts official upstream installers even when `winget` is unavailable
 - theme token generation and output rendering
 - snapshot and rollback primitives with adapter backup/restore
 - `muks` CLI
@@ -68,6 +69,8 @@ cargo run -p muks-cli -- mod apply curated
 cargo run -p muks-cli -- watch --iterations 100 --interval-ms 500
 cargo run -p muks-cli -- adapter configure yasb --enabled false
 ```
+
+`install --apply` may still require elevated permissions on some systems because upstream installers can enforce admin scope.
 
 ## Local install
 

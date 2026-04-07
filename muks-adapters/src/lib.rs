@@ -205,14 +205,12 @@ impl Adapter for LivelyAdapter {
         )
     }
     fn detect(&self, paths: &AppPaths) -> AdapterStatus {
-        detect_from_candidates(
-            self.metadata(paths),
-            vec![
-                env_path("%LOCALAPPDATA%\\Programs\\Lively Wallpaper\\Lively.exe"),
-                env_path("%PROGRAMFILES%\\Lively Wallpaper\\Lively.exe"),
-            ],
-            None,
-        )
+        let mut candidates = vec![
+            env_path("%LOCALAPPDATA%\\Programs\\Lively Wallpaper\\Lively.exe"),
+            env_path("%PROGRAMFILES%\\Lively Wallpaper\\Lively.exe"),
+        ];
+        candidates.extend(registry_install_candidates("Lively", "Lively.exe"));
+        detect_from_candidates(self.metadata(paths), candidates, None)
     }
     fn install(&self, _paths: &AppPaths) -> Result<String> {
         Ok("Install Lively Wallpaper from the official site or GitHub releases.".to_string())
@@ -282,14 +280,12 @@ impl Adapter for RainmeterAdapter {
         )
     }
     fn detect(&self, paths: &AppPaths) -> AdapterStatus {
-        detect_from_candidates(
-            self.metadata(paths),
-            vec![
-                env_path("%PROGRAMFILES%\\Rainmeter\\Rainmeter.exe"),
-                env_path("%PROGRAMFILES(X86)%\\Rainmeter\\Rainmeter.exe"),
-            ],
-            None,
-        )
+        let mut candidates = vec![
+            env_path("%PROGRAMFILES%\\Rainmeter\\Rainmeter.exe"),
+            env_path("%PROGRAMFILES(X86)%\\Rainmeter\\Rainmeter.exe"),
+        ];
+        candidates.extend(registry_install_candidates("Rainmeter", "Rainmeter.exe"));
+        detect_from_candidates(self.metadata(paths), candidates, None)
     }
     fn install(&self, _paths: &AppPaths) -> Result<String> {
         Ok("Install Rainmeter from rainmeter.net or the official documentation link.".to_string())
@@ -367,14 +363,12 @@ impl Adapter for YasbAdapter {
         )
     }
     fn detect(&self, paths: &AppPaths) -> AdapterStatus {
-        detect_from_candidates(
-            self.metadata(paths),
-            vec![
-                env_path("%PROGRAMFILES%\\YASB\\yasb.exe"),
-                env_path("%LOCALAPPDATA%\\Programs\\YASB\\yasb.exe"),
-            ],
-            None,
-        )
+        let mut candidates = vec![
+            env_path("%PROGRAMFILES%\\YASB\\yasb.exe"),
+            env_path("%LOCALAPPDATA%\\Programs\\YASB\\yasb.exe"),
+        ];
+        candidates.extend(registry_install_candidates("YASB", "yasb.exe"));
+        detect_from_candidates(self.metadata(paths), candidates, None)
     }
     fn install(&self, _paths: &AppPaths) -> Result<String> {
         Ok("Install YASB from the official installer or official GitHub releases.".to_string())
@@ -465,14 +459,15 @@ impl Adapter for KomorebiAdapter {
     }
     fn detect(&self, paths: &AppPaths) -> AdapterStatus {
         let command_version = read_command_output("komorebi", &["--version"]);
-        let mut status = detect_from_candidates(
-            self.metadata(paths),
-            vec![
-                env_path("%USERPROFILE%\\komorebi\\komorebi.exe"),
-                env_path("%PROGRAMFILES%\\komorebi\\komorebi.exe"),
-            ],
-            command_version,
-        );
+        let mut candidates = vec![
+            env_path("%USERPROFILE%\\komorebi\\komorebi.exe"),
+            env_path("%PROGRAMFILES%\\komorebi\\komorebi.exe"),
+        ];
+        candidates.extend(registry_install_candidates(
+            "Komorebi|komorebi",
+            "komorebi.exe",
+        ));
+        let mut status = detect_from_candidates(self.metadata(paths), candidates, command_version);
         if command_exists("komorebi.exe") {
             status.installed = true;
             status.health = AdapterHealth::Healthy;
@@ -556,14 +551,12 @@ impl Adapter for WindhawkAdapter {
         )
     }
     fn detect(&self, paths: &AppPaths) -> AdapterStatus {
-        detect_from_candidates(
-            self.metadata(paths),
-            vec![
-                env_path("%PROGRAMFILES%\\Windhawk\\windhawk.exe"),
-                env_path("%LOCALAPPDATA%\\Programs\\Windhawk\\windhawk.exe"),
-            ],
-            None,
-        )
+        let mut candidates = vec![
+            env_path("%PROGRAMFILES%\\Windhawk\\windhawk.exe"),
+            env_path("%LOCALAPPDATA%\\Programs\\Windhawk\\windhawk.exe"),
+        ];
+        candidates.extend(registry_install_candidates("Windhawk", "windhawk.exe"));
+        detect_from_candidates(self.metadata(paths), candidates, None)
     }
     fn install(&self, _paths: &AppPaths) -> Result<String> {
         Ok(
@@ -831,6 +824,50 @@ fn env_path(template: &str) -> PathBuf {
         value = value.replace(key, &replacement);
     }
     PathBuf::from(value)
+}
+
+fn registry_install_candidates(display_name_pattern: &str, exe_name: &str) -> Vec<PathBuf> {
+    let escaped_pattern = display_name_pattern.replace('\'', "''");
+    let escaped_exe = exe_name.replace('\'', "''");
+    let script = format!(
+        "$roots=@('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'); \
+         Get-ItemProperty -Path $roots -ErrorAction SilentlyContinue | \
+         Where-Object {{ $_.DisplayName -and $_.DisplayName -match '{pattern}' }} | \
+         ForEach-Object {{ \
+           if ($_.DisplayIcon) {{ ($_.DisplayIcon -split ',')[0].Trim('\"') }}; \
+           if ($_.InstallLocation) {{ Join-Path $_.InstallLocation '{exe}' }} \
+         }}",
+        pattern = escaped_pattern,
+        exe = escaped_exe
+    );
+
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .output();
+
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let mut candidates = Vec::new();
+    for line in raw.lines() {
+        let cleaned = line.trim().trim_matches('"');
+        if cleaned.is_empty() {
+            continue;
+        }
+        let path = PathBuf::from(cleaned);
+        if path.exists() {
+            candidates.push(path);
+        }
+    }
+
+    candidates.sort();
+    candidates.dedup();
+    candidates
 }
 
 fn detect_from_candidates(
