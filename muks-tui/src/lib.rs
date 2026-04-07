@@ -108,13 +108,17 @@ impl Dashboard {
     fn install_plan(&mut self) -> Result<()> {
         let report = Installer::new().install_all(&self.state.paths, false)?;
         self.log(format!(
-            "Install plan generated. winget available: {}",
-            report.winget_available
+            "Install plan generated. winget available: {} report={}",
+            report.winget_available, report.report_path
         ));
         for step in report.steps {
             self.log(format!(
-                "[{}] strategy={} installed={} {}",
-                step.tool, step.strategy, step.installed, step.note
+                "[{}] strategy={} installed={} version={} {}",
+                step.tool,
+                step.strategy,
+                step.installed,
+                step.detected_version.as_deref().unwrap_or("unknown"),
+                step.note
             ));
         }
         Ok(())
@@ -123,16 +127,17 @@ impl Dashboard {
     fn install_apply(&mut self) -> Result<()> {
         let report = Installer::new().install_all(&self.state.paths, true)?;
         self.log(format!(
-            "Install apply executed. winget available: {}",
-            report.winget_available
+            "Install apply executed. winget available: {} report={}",
+            report.winget_available, report.report_path
         ));
         for step in report.steps {
             self.log(format!(
-                "[{}] installed={} attempted={} success={} {}",
+                "[{}] installed={} attempted={} success={} version={} {}",
                 step.tool,
                 step.installed,
                 step.attempted_install,
                 step.install_succeeded,
+                step.detected_version.as_deref().unwrap_or("unknown"),
                 step.note
             ));
         }

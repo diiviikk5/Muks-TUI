@@ -660,6 +660,7 @@ dependencies = [
  "muks-adapters",
  "muks-common",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

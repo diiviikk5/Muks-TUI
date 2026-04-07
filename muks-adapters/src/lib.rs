@@ -839,6 +839,16 @@ fn detect_from_candidates(
     version: Option<String>,
 ) -> AdapterStatus {
     let installed = candidates.iter().any(|path| path.exists());
+    let detected_version = if installed {
+        version.or_else(|| {
+            candidates
+                .iter()
+                .find(|path| path.exists())
+                .and_then(read_windows_file_version)
+        })
+    } else {
+        version
+    };
     let details = if installed {
         "Detected through common install paths.".to_string()
     } else {
@@ -847,7 +857,7 @@ fn detect_from_candidates(
     AdapterStatus {
         tool: metadata.tool,
         installed,
-        version,
+        version: detected_version,
         health: if installed {
             AdapterHealth::Healthy
         } else {
@@ -888,6 +898,19 @@ fn artifact(adapter: &str, files: Vec<PathBuf>) -> GeneratedArtifact {
         live_targets: Vec::new(),
         notes: Vec::new(),
     }
+}
+
+fn read_windows_file_version(path: &PathBuf) -> Option<String> {
+    if !path.exists() {
+        return None;
+    }
+
+    let escaped = path.display().to_string().replace('\'', "''");
+    let script = format!(
+        "$ErrorActionPreference='Stop'; (Get-Item -LiteralPath '{}').VersionInfo.ProductVersion",
+        escaped
+    );
+    read_command_output("powershell", &["-NoProfile", "-Command", &script])
 }
 
 #[cfg(test)]

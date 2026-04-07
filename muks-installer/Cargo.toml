@@ -12,3 +12,4 @@ anyhow.workspace = true
 muks-adapters = { path = "../muks-adapters" }
 muks-common = { path = "../muks-common" }
 serde.workspace = true
+serde_json.workspace = true

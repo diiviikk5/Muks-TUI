@@ -272,11 +272,14 @@ fn run_command(cli: Cli) -> Result<()> {
             let report = Installer::new().install_all(&state.paths, command.apply)?;
             println!("Muks install plan");
             println!("winget available: {}", report.winget_available);
+            println!("generated at epoch: {}", report.generated_at_epoch);
+            println!("report path: {}", report.report_path);
             for step in report.steps {
                 println!(
-                    "- {} | installed={} | strategy={} | attempted_install={} | success={} | {}",
+                    "- {} | installed={} | version={} | strategy={} | attempted_install={} | success={} | {}",
                     step.tool,
                     step.installed,
+                    step.detected_version.as_deref().unwrap_or("unknown"),
                     step.strategy,
                     step.attempted_install,
                     step.install_succeeded,
@@ -298,9 +301,10 @@ fn run_command(cli: Cli) -> Result<()> {
             println!("Adapters:");
             for adapter in adapters {
                 println!(
-                    "  - {} | installed={} | {:?} | {}",
+                    "  - {} | installed={} | version={} | {:?} | {}",
                     adapter.metadata.display_name,
                     adapter.installed,
+                    adapter.version.as_deref().unwrap_or("unknown"),
                     adapter.health,
                     adapter.details
                 );
@@ -426,8 +430,12 @@ fn run_command(cli: Cli) -> Result<()> {
                 let status = registry.adapter_status(&name, &state.paths)?;
                 let guidance = registry.doctor(&name, &state.paths)?;
                 println!(
-                    "{} | installed={} | {:?} | {}",
-                    status.metadata.display_name, status.installed, status.health, status.details
+                    "{} | installed={} | version={} | {:?} | {}",
+                    status.metadata.display_name,
+                    status.installed,
+                    status.version.as_deref().unwrap_or("unknown"),
+                    status.health,
+                    status.details
                 );
                 println!("doctor: {}", guidance);
             }
@@ -489,8 +497,11 @@ fn run_doctor(
     for status in &statuses {
         let guidance = registry.doctor(status.tool.as_str(), &state.paths)?;
         println!(
-            "- {} | installed={} | {:?}",
-            status.metadata.display_name, status.installed, status.health
+            "- {} | installed={} | version={} | {:?}",
+            status.metadata.display_name,
+            status.installed,
+            status.version.as_deref().unwrap_or("unknown"),
+            status.health
         );
         println!("  details: {}", status.details);
         println!("  guidance: {}", guidance);
@@ -502,10 +513,15 @@ fn run_doctor(
     if repair {
         println!("\nRepair mode: attempting installer actions...");
         let report = Installer::new().install_all(&state.paths, true)?;
+        println!("Install report: {}", report.report_path);
         for step in report.steps {
             println!(
-                "  [{}] attempted={} success={} {}",
-                step.tool, step.attempted_install, step.install_succeeded, step.note
+                "  [{}] attempted={} success={} version={} {}",
+                step.tool,
+                step.attempted_install,
+                step.install_succeeded,
+                step.detected_version.as_deref().unwrap_or("unknown"),
+                step.note
             );
         }
 
@@ -513,8 +529,11 @@ fn run_doctor(
         let post = registry.detect_all(&state.paths)?;
         for status in &post {
             println!(
-                "  - {} | installed={} | {:?}",
-                status.metadata.display_name, status.installed, status.health
+                "  - {} | installed={} | version={} | {:?}",
+                status.metadata.display_name,
+                status.installed,
+                status.version.as_deref().unwrap_or("unknown"),
+                status.health
             );
         }
         issues = post.iter().filter(|status| !status.installed).count();

@@ -2,12 +2,15 @@ use anyhow::Result;
 use muks_adapters::AdapterRegistry;
 use muks_common::{AppPaths, ToolName, command_exists};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallStep {
     pub tool: String,
     pub installed: bool,
+    pub detected_version: Option<String>,
     pub strategy: String,
     pub note: String,
     pub attempted_install: bool,
@@ -16,8 +19,10 @@ pub struct InstallStep {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallReport {
+    pub generated_at_epoch: u64,
     pub steps: Vec<InstallStep>,
     pub winget_available: bool,
+    pub report_path: String,
 }
 
 pub struct Installer {
@@ -127,6 +132,7 @@ impl Installer {
             steps.push(InstallStep {
                 tool: status.tool.as_str().to_string(),
                 installed: status.installed,
+                detected_version: status.version.clone(),
                 strategy,
                 note,
                 attempted_install,
@@ -134,10 +140,14 @@ impl Installer {
             });
         }
 
-        Ok(InstallReport {
+        let mut report = InstallReport {
+            generated_at_epoch: current_epoch(),
             steps,
             winget_available,
-        })
+            report_path: String::new(),
+        };
+        report.report_path = persist_report(paths, &report)?;
+        Ok(report)
     }
 }
 
@@ -149,4 +159,23 @@ fn winget_package_id(tool: ToolName) -> Option<&'static str> {
         ToolName::Komorebi => Some("LGUG2Z.komorebi"),
         ToolName::Windhawk => None,
     }
+}
+
+fn persist_report(paths: &AppPaths, report: &InstallReport) -> Result<String> {
+    let target = paths.logs.join("install-report.json");
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let report_path = target.display().to_string();
+    let mut stored = report.clone();
+    stored.report_path = report_path.clone();
+    fs::write(&target, serde_json::to_vec_pretty(&stored)?)?;
+    Ok(report_path)
+}
+
+fn current_epoch() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
 }

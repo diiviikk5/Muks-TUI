@@ -15,6 +15,7 @@ It installs, detects, themes, and orchestrates the best existing desktop customi
 - `%USERPROFILE%\\.muks` config and generated state
 - adapter registry for all five engines
 - install planning and health detection
+- install planning persists JSON reports at `%USERPROFILE%\\.muks\\logs\\install-report.json`
 - theme token generation and output rendering
 - snapshot and rollback primitives with adapter backup/restore
 - `muks` CLI
