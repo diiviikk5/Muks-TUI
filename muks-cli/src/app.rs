@@ -23,7 +23,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Install(InstallCommand),
-    Doctor,
+    Doctor(DoctorCommand),
     Status,
     Tui,
     Wallpaper(WallpaperCommand),
@@ -43,6 +43,14 @@ enum Commands {
 struct InstallCommand {
     #[arg(long)]
     apply: bool,
+}
+
+#[derive(Args)]
+struct DoctorCommand {
+    #[arg(long)]
+    repair: bool,
+    #[arg(long)]
+    strict: bool,
 }
 
 #[derive(Args)]
@@ -276,18 +284,8 @@ fn run_command(cli: Cli) -> Result<()> {
                 );
             }
         }
-        Commands::Doctor => {
-            let statuses = registry.detect_all(&state.paths)?;
-            let mut issues = 0usize;
-            for status in &statuses {
-                if !status.installed {
-                    issues += 1;
-                    println!("- {}: {}", status.metadata.display_name, status.details);
-                }
-            }
-            if issues == 0 {
-                println!("System looks healthy. All known adapters are reachable.");
-            }
+        Commands::Doctor(command) => {
+            run_doctor(&state, &registry, command.repair, command.strict)?;
         }
         Commands::Status => {
             let report = state.status_report()?;
@@ -426,10 +424,12 @@ fn run_command(cli: Cli) -> Result<()> {
             }
             AdapterSubcommand::Status { name } => {
                 let status = registry.adapter_status(&name, &state.paths)?;
+                let guidance = registry.doctor(&name, &state.paths)?;
                 println!(
                     "{} | installed={} | {:?} | {}",
                     status.metadata.display_name, status.installed, status.health, status.details
                 );
+                println!("doctor: {}", guidance);
             }
             AdapterSubcommand::Reinstall { name } => {
                 println!("{}", registry.reinstall(&name, &state.paths)?);
@@ -467,10 +467,73 @@ fn run_command(cli: Cli) -> Result<()> {
                 std::time::Duration::from_millis(command.interval_ms),
             )?;
             println!(
-                "Watch loop completed after {} iterations. Triggered apply: {}",
-                report.iterations, report.triggered_apply
+                "Watch loop completed after {} iterations. Triggered apply: {} (count={})",
+                report.iterations, report.triggered_apply, report.apply_count
             );
         }
+    }
+
+    Ok(())
+}
+
+fn run_doctor(
+    state: &MuksState,
+    registry: &AdapterRegistry,
+    repair: bool,
+    strict: bool,
+) -> Result<()> {
+    println!("Muks doctor report");
+    let statuses = registry.detect_all(&state.paths)?;
+    let mut issues = 0usize;
+
+    for status in &statuses {
+        let guidance = registry.doctor(status.tool.as_str(), &state.paths)?;
+        println!(
+            "- {} | installed={} | {:?}",
+            status.metadata.display_name, status.installed, status.health
+        );
+        println!("  details: {}", status.details);
+        println!("  guidance: {}", guidance);
+        if !status.installed {
+            issues += 1;
+        }
+    }
+
+    if repair {
+        println!("\nRepair mode: attempting installer actions...");
+        let report = Installer::new().install_all(&state.paths, true)?;
+        for step in report.steps {
+            println!(
+                "  [{}] attempted={} success={} {}",
+                step.tool, step.attempted_install, step.install_succeeded, step.note
+            );
+        }
+
+        println!("\nPost-repair health check:");
+        let post = registry.detect_all(&state.paths)?;
+        for status in &post {
+            println!(
+                "  - {} | installed={} | {:?}",
+                status.metadata.display_name, status.installed, status.health
+            );
+        }
+        issues = post.iter().filter(|status| !status.installed).count();
+    }
+
+    if issues == 0 {
+        println!("\nDoctor result: healthy");
+        return Ok(());
+    }
+
+    println!(
+        "\nDoctor result: {} adapter(s) still need attention.",
+        issues
+    );
+    if strict {
+        return Err(anyhow!(
+            "doctor strict mode failed with {} issue(s)",
+            issues
+        ));
     }
 
     Ok(())
@@ -514,7 +577,7 @@ fn print_apply_result(message: &str, generated: &[GeneratedArtifact]) {
 fn print_shell_help() {
     println!("{}", colorize("Common commands:", 140, 170, 240));
     println!("  status");
-    println!("  doctor");
+    println!("  doctor --repair --strict");
     println!("  install");
     println!("  theme apply <preset> --best-effort");
     println!("  wallpaper set <name|path|url>");

@@ -889,3 +889,29 @@ fn artifact(adapter: &str, files: Vec<PathBuf>) -> GeneratedArtifact {
         notes: Vec::new(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adapter_enable_flags_follow_config() {
+        let mut config = AppConfig::default();
+        assert!(adapter_enabled(ToolName::Lively, &config));
+        assert!(adapter_enabled(ToolName::Rainmeter, &config));
+        assert!(adapter_enabled(ToolName::Yasb, &config));
+        assert!(adapter_enabled(ToolName::Komorebi, &config));
+        assert!(adapter_enabled(ToolName::Windhawk, &config));
+
+        config.rainmeter.enabled = false;
+        config.yasb.enabled = false;
+        config.komorebi.enabled = false;
+        config.windhawk.enabled = false;
+
+        assert!(adapter_enabled(ToolName::Lively, &config));
+        assert!(!adapter_enabled(ToolName::Rainmeter, &config));
+        assert!(!adapter_enabled(ToolName::Yasb, &config));
+        assert!(!adapter_enabled(ToolName::Komorebi, &config));
+        assert!(!adapter_enabled(ToolName::Windhawk, &config));
+    }
+}

@@ -42,6 +42,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Dashboar
                     KeyCode::Char('q') | KeyCode::Esc => break,
                     KeyCode::Char('r') => app.refresh()?,
                     KeyCode::Char('d') => app.doctor(),
+                    KeyCode::Char('f') => app.doctor_repair()?,
                     KeyCode::Char('i') => app.install_plan()?,
                     KeyCode::Char('I') => app.install_apply()?,
                     KeyCode::Char('a') => app.apply_sync(true)?,
@@ -150,6 +151,23 @@ impl Dashboard {
         for line in lines {
             self.log(line);
         }
+    }
+
+    fn doctor_repair(&mut self) -> Result<()> {
+        self.doctor();
+        let report = Installer::new().install_all(&self.state.paths, true)?;
+        self.log(format!(
+            "Repair mode executed. winget available: {}",
+            report.winget_available
+        ));
+        for step in report.steps {
+            self.log(format!(
+                "[{}] attempted={} success={} {}",
+                step.tool, step.attempted_install, step.install_succeeded, step.note
+            ));
+        }
+        self.refresh()?;
+        Ok(())
     }
 
     fn apply_sync(&mut self, best_effort: bool) -> Result<()> {
@@ -353,7 +371,7 @@ fn draw(frame: &mut Frame<'_>, app: &Dashboard) {
         .map(|tool| tool.display_name())
         .unwrap_or("None");
     let side = Paragraph::new(format!(
-        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  i  install plan\n  I  install apply\n  a  apply full sync\n  p  apply selected\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
+        "Selected: {}\nSnapshots: {}\n\nActions:\n  r  refresh\n  d  doctor\n  f  doctor repair\n  i  install plan\n  I  install apply\n  a  apply full sync\n  p  apply selected\n  x  reinstall selected\n  s  snapshot create\n  u  rollback latest\n  q  quit",
         selected_name, app.snapshot_count
     ))
     .block(Block::default().title("Actions").borders(Borders::ALL));

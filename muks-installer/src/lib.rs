@@ -72,9 +72,9 @@ impl Installer {
             };
 
             if apply && !status.installed {
-                attempted_install = true;
                 if winget_available {
                     if let Some(winget_id) = winget_package_id(status.tool) {
+                        attempted_install = true;
                         let result = Command::new("winget")
                             .args([
                                 "install",
@@ -112,12 +112,14 @@ impl Installer {
                             }
                         }
                     } else {
+                        attempted_install = false;
                         note = format!(
                             "No winget package id configured for {}. {}",
                             status.metadata.display_name, note
                         );
                     }
                 } else {
+                    attempted_install = false;
                     note = format!("winget unavailable; install manually. {}", note);
                 }
             }

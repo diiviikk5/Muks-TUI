@@ -28,6 +28,7 @@ It installs, detects, themes, and orchestrates the best existing desktop customi
 ```powershell
 cargo run -p muks-cli -- status
 cargo run -p muks-cli -- doctor
+cargo run -p muks-cli -- doctor --repair
 cargo run -p muks-cli -- tui
 cargo run -p muks-cli --bin mukss
 cargo run -p muks-cli -- theme apply graphite --best-effort
@@ -39,6 +40,7 @@ Inside `muks tui`:
 
 - `r` refresh adapter + profile state
 - `d` doctor summary in activity log
+- `f` run repair flow (doctor + install apply)
 - `i` generate install plan
 - `I` attempt installer execution (`winget` + official guidance fallback)
 - `a` apply full adapter sync (all five adapters)
@@ -58,6 +60,7 @@ cargo run -p muks-cli -- bar reload
 cargo run -p muks-cli -- widgets reload
 cargo run -p muks-cli -- tile start
 cargo run -p muks-cli -- mod apply curated
+cargo run -p muks-cli -- watch --iterations 100 --interval-ms 500
 ```
 
 ## Local install
