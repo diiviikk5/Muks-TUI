@@ -13,10 +13,15 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
-use std::io::{self, Stdout};
+use std::io::{self, IsTerminal, Stdout};
 use std::time::Duration;
 
 pub fn start_tui() -> Result<()> {
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        println!("MUKS TUI requires an interactive terminal session.");
+        return Ok(());
+    }
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
