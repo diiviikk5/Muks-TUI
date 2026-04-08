@@ -17,7 +17,7 @@ use std::process::Command;
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -282,7 +282,11 @@ fn run_command(cli: Cli) -> Result<()> {
     let state = MuksState::new()?;
     let registry = AdapterRegistry::new();
 
-    match cli.command {
+    let Some(command) = cli.command else {
+        return run_shell();
+    };
+
+    match command {
         Commands::Install(command) => {
             let report = Installer::new().install_all(&state.paths, command.apply)?;
             println!("Muks install plan");
