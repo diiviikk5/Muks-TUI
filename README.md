@@ -40,6 +40,8 @@ Then open a new terminal and use Muks directly:
 muks
 muks status
 muks doctor
+muks scene list
+muks scene apply hyperbeam --best-effort
 muks theme apply cyber --best-effort
 muks wallpaper set rose
 muks widgets reload
@@ -103,5 +105,6 @@ cargo run -p muks-cli -- adapter configure yasb --enabled false
 - `muks widgets reload` now generates a multi-skin Rainmeter `Muks` pack with `Dashboard`, `Dock`, and `Pulse` surfaces and syncs it into the active Rainmeter `SkinPath`.
 - `muks widgets profile <aurora|zen|hyper|orbit>` switches the Rainmeter widget pack style through Muks itself.
 - `muks bar profile <aurora|zen|hyper|orbit>` switches the generated YASB bar style and module layout.
+- `muks scene apply <atelier|greenroom|hyperbeam|deepfield>` switches wallpaper, theme, widget profile, bar profile, workspace label, and generated adapter configs in one shot.
 - `muks theme apply <preset>` now updates wallpaper, widget/bar profiles, generated adapter configs, and snapshot state in one pass.
 - `install.ps1` installs `muks.exe` and `mukss.exe` into `%USERPROFILE%\.muks\bin` and adds that folder to the user `PATH`.

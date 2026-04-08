@@ -22,6 +22,8 @@ try {
 
     $installRoot = Join-Path $env:USERPROFILE ".muks\bin"
     New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+    Get-Process muks,mukss -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 300
     Copy-Item (Join-Path $binaryDir "muks.exe") (Join-Path $installRoot "muks.exe") -Force
     Copy-Item (Join-Path $binaryDir "mukss.exe") (Join-Path $installRoot "mukss.exe") -Force
 

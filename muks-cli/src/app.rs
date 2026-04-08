@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use clap::{Args, Parser, Subcommand};
 use muks_adapters::{AdapterRegistry, ApplyRequest, GeneratedArtifact};
 use muks_common::{command_exists, init_logging};
-use muks_core::{MuksState, theme::derive_tokens};
+use muks_core::{MuksState, built_in_scenes, theme::derive_tokens};
 use muks_installer::Installer;
 use muks_syncd::SyncDaemon;
 use std::ffi::OsString;
@@ -28,6 +28,7 @@ enum Commands {
     Tui,
     Wallpaper(WallpaperCommand),
     Theme(ThemeCommand),
+    Scene(SceneCommand),
     Bar(ReloadCommand),
     Widgets(ReloadCommand),
     Tile(TileCommand),
@@ -87,6 +88,22 @@ enum ThemeSubcommand {
 struct ReloadCommand {
     #[command(subcommand)]
     command: ReloadSubcommand,
+}
+
+#[derive(Args)]
+struct SceneCommand {
+    #[command(subcommand)]
+    command: SceneSubcommand,
+}
+
+#[derive(Subcommand)]
+enum SceneSubcommand {
+    List,
+    Apply {
+        scene: String,
+        #[arg(long)]
+        best_effort: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -318,6 +335,9 @@ fn run_command(cli: Cli) -> Result<()> {
             println!("Profile: {}", report.profile_name);
             println!("Preset: {}", report.preset);
             println!("Wallpaper: {}", report.wallpaper);
+            println!("Widgets profile: {}", config.rainmeter.profile);
+            println!("Bar profile: {}", config.yasb.profile);
+            println!("Windhawk profile: {}", config.windhawk.profile);
             println!("Config: {}", report.config_path);
             println!("Snapshots: {}", report.snapshot_count);
             println!("Adapters:");
@@ -360,6 +380,35 @@ fn run_command(cli: Cli) -> Result<()> {
                 let request = build_request(&state, best_effort)?;
                 let generated = registry.apply_all(&request)?;
                 print_apply_result("Theme sync complete.", &generated);
+            }
+        },
+        Commands::Scene(command) => match command.command {
+            SceneSubcommand::List => {
+                println!("Scenes:");
+                for scene in built_in_scenes() {
+                    println!(
+                        "  - {} | {} | theme={} widgets={} bar={} wallpaper={}",
+                        scene.id,
+                        scene.name,
+                        scene.theme_preset,
+                        scene.rainmeter_profile,
+                        scene.yasb_profile,
+                        scene.wallpaper
+                    );
+                }
+            }
+            SceneSubcommand::Apply { scene, best_effort } => {
+                let snapshot = state.create_backup("scene-apply")?;
+                let config = state.apply_scene(&scene)?;
+                let request = ApplyRequest {
+                    tokens: derive_tokens(&config),
+                    config,
+                    paths: state.paths.clone(),
+                    best_effort,
+                };
+                let generated = registry.apply_all(&request)?;
+                println!("Snapshot: {}", snapshot.id);
+                print_apply_result(&format!("Scene `{}` synced.", scene), &generated);
             }
         },
         Commands::Bar(command) => match command.command {
@@ -712,6 +761,8 @@ fn print_shell_help() {
     println!("  doctor --repair --strict");
     println!("  install");
     println!("  theme apply <preset> --best-effort");
+    println!("  scene list");
+    println!("  scene apply <atelier|greenroom|hyperbeam|deepfield> --best-effort");
     println!("  wallpaper set <name|path|url>");
     println!("  widgets list-profiles");
     println!("  widgets profile <aurora|zen|hyper|orbit>");

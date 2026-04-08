@@ -32,6 +32,19 @@ pub struct MuksState {
     pub paths: AppPaths,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ScenePreset {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub theme_preset: &'static str,
+    pub wallpaper: &'static str,
+    pub wallpaper_source_type: &'static str,
+    pub workspace_name: &'static str,
+    pub rainmeter_profile: &'static str,
+    pub yasb_profile: &'static str,
+    pub windhawk_profile: &'static str,
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 struct PresetFile {
@@ -143,6 +156,44 @@ impl MuksState {
     pub fn set_windhawk_profile(&self, profile: &str) -> Result<AppConfig> {
         let mut config = self.config()?;
         config.windhawk.profile = profile.to_string();
+        self.save_config(&config)?;
+        Ok(config)
+    }
+
+    pub fn apply_scene(&self, scene_id: &str) -> Result<AppConfig> {
+        let scene = scene_preset(scene_id)?;
+        let mut config = self.config()?;
+        config.profile.name = scene.name.to_string();
+        config.profile.preset = scene.theme_preset.to_string();
+        config.profile.workspace_name = scene.workspace_name.to_string();
+
+        config.wallpaper.current = scene.wallpaper.to_string();
+        config.wallpaper.source_type = scene.wallpaper_source_type.to_string();
+        config.wallpaper.fit_mode = "fill".to_string();
+        config.wallpaper.auto_extract_palette = true;
+
+        config.theme.preset = scene.theme_preset.to_string();
+        config.theme.accent_override = None;
+        config.theme.accent_soft_override = None;
+        config.theme.background_override = None;
+        config.theme.surface_override = None;
+        config.theme.text_override = None;
+
+        config.rainmeter.profile = scene.rainmeter_profile.to_string();
+        config.yasb.profile = scene.yasb_profile.to_string();
+        config.windhawk.profile = scene.windhawk_profile.to_string();
+
+        if let Some(preset_file) = self.load_preset_file(scene.theme_preset)? {
+            apply_preset_file(&mut config, preset_file);
+        }
+        config.rainmeter.profile = scene.rainmeter_profile.to_string();
+        config.yasb.profile = scene.yasb_profile.to_string();
+        config.windhawk.profile = scene.windhawk_profile.to_string();
+        config.wallpaper.current = scene.wallpaper.to_string();
+        config.wallpaper.source_type = scene.wallpaper_source_type.to_string();
+        config.profile.name = scene.name.to_string();
+        config.profile.workspace_name = scene.workspace_name.to_string();
+
         self.save_config(&config)?;
         Ok(config)
     }
@@ -325,6 +376,63 @@ fn adapter_config_mut<'a>(
         }
         _ => anyhow::bail!("unknown adapter `{}`", name),
     }
+}
+
+pub fn built_in_scenes() -> &'static [ScenePreset] {
+    &[
+        ScenePreset {
+            id: "atelier",
+            name: "Atelier Rose",
+            theme_preset: "rose",
+            wallpaper: "rose",
+            wallpaper_source_type: "preset",
+            workspace_name: "creative",
+            rainmeter_profile: "aurora",
+            yasb_profile: "aurora",
+            windhawk_profile: "curated",
+        },
+        ScenePreset {
+            id: "greenroom",
+            name: "Greenroom Focus",
+            theme_preset: "forest",
+            wallpaper: "forest",
+            wallpaper_source_type: "preset",
+            workspace_name: "focus",
+            rainmeter_profile: "zen",
+            yasb_profile: "zen",
+            windhawk_profile: "curated",
+        },
+        ScenePreset {
+            id: "hyperbeam",
+            name: "Hyperbeam",
+            theme_preset: "cyber",
+            wallpaper: "cyber",
+            wallpaper_source_type: "preset",
+            workspace_name: "build",
+            rainmeter_profile: "hyper",
+            yasb_profile: "hyper",
+            windhawk_profile: "curated",
+        },
+        ScenePreset {
+            id: "deepfield",
+            name: "Deepfield Orbit",
+            theme_preset: "nebula",
+            wallpaper: "nebula",
+            wallpaper_source_type: "preset",
+            workspace_name: "main",
+            rainmeter_profile: "orbit",
+            yasb_profile: "orbit",
+            windhawk_profile: "curated",
+        },
+    ]
+}
+
+fn scene_preset(scene_id: &str) -> Result<ScenePreset> {
+    built_in_scenes()
+        .iter()
+        .find(|scene| scene.id.eq_ignore_ascii_case(scene_id))
+        .copied()
+        .ok_or_else(|| anyhow::anyhow!("unknown scene `{}`", scene_id))
 }
 
 #[cfg(test)]
