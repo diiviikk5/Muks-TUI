@@ -43,6 +43,10 @@ muks doctor
 muks theme apply cyber --best-effort
 muks wallpaper set rose
 muks widgets reload
+muks widgets list-profiles
+muks widgets profile hyper
+muks bar list-profiles
+muks bar profile orbit
 ```
 
 `muks` with no subcommand starts the branded interactive shell. `mukss` is also installed as a direct alias for that shell.
@@ -96,6 +100,8 @@ cargo run -p muks-cli -- adapter configure yasb --enabled false
 ## Working v1-visible actions
 
 - `muks wallpaper set <preset|file|url>` now applies through Lively and generates local preset wallpapers for built-in names like `rose`, `cyber`, and `nebula`.
-- `muks widgets reload` now generates a real Rainmeter `Muks` skin and syncs it into the active Rainmeter `SkinPath`.
-- `muks theme apply <preset>` now updates wallpaper, Rainmeter widget tokens, generated adapter configs, and snapshot state in one pass.
+- `muks widgets reload` now generates a multi-skin Rainmeter `Muks` pack with `Dashboard`, `Dock`, and `Pulse` surfaces and syncs it into the active Rainmeter `SkinPath`.
+- `muks widgets profile <aurora|zen|hyper|orbit>` switches the Rainmeter widget pack style through Muks itself.
+- `muks bar profile <aurora|zen|hyper|orbit>` switches the generated YASB bar style and module layout.
+- `muks theme apply <preset>` now updates wallpaper, widget/bar profiles, generated adapter configs, and snapshot state in one pass.
 - `install.ps1` installs `muks.exe` and `mukss.exe` into `%USERPROFILE%\.muks\bin` and adds that folder to the user `PATH`.

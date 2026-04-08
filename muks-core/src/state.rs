@@ -200,23 +200,23 @@ impl MuksState {
         let defaults = [
             (
                 "graphite.toml",
-                "[profile]\nname = \"Graphite\"\nworkspace_name = \"main\"\n\n[wallpaper]\ncurrent = \"graphite\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#8ab4ff\"\naccent_soft_override = \"#6f8fd0\"\nbackground_override = \"#11131a\"\nsurface_override = \"#1a1f2a\"\ntext_override = \"#f1f5ff\"\n",
+                "[profile]\nname = \"Graphite\"\nworkspace_name = \"main\"\n\n[wallpaper]\ncurrent = \"graphite\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#8ab4ff\"\naccent_soft_override = \"#6f8fd0\"\nbackground_override = \"#11131a\"\nsurface_override = \"#1a1f2a\"\ntext_override = \"#f1f5ff\"\n\n[rainmeter]\nprofile = \"aurora\"\n\n[yasb]\nprofile = \"aurora\"\n",
             ),
             (
                 "forest.toml",
-                "[profile]\nname = \"Forest Glass\"\nworkspace_name = \"focus\"\n\n[wallpaper]\ncurrent = \"forest\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#7ecf9a\"\naccent_soft_override = \"#5fa97b\"\nbackground_override = \"#101914\"\nsurface_override = \"#17251d\"\ntext_override = \"#ecfff2\"\n",
+                "[profile]\nname = \"Forest Glass\"\nworkspace_name = \"focus\"\n\n[wallpaper]\ncurrent = \"forest\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#7ecf9a\"\naccent_soft_override = \"#5fa97b\"\nbackground_override = \"#101914\"\nsurface_override = \"#17251d\"\ntext_override = \"#ecfff2\"\n\n[rainmeter]\nprofile = \"zen\"\n\n[yasb]\nprofile = \"zen\"\n",
             ),
             (
                 "rose.toml",
-                "[profile]\nname = \"Rose Dusk\"\nworkspace_name = \"creative\"\n\n[wallpaper]\ncurrent = \"rose\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#f1a7bd\"\naccent_soft_override = \"#c88498\"\nbackground_override = \"#1a1117\"\nsurface_override = \"#281a23\"\ntext_override = \"#ffeef4\"\n",
+                "[profile]\nname = \"Rose Dusk\"\nworkspace_name = \"creative\"\n\n[wallpaper]\ncurrent = \"rose\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#f1a7bd\"\naccent_soft_override = \"#c88498\"\nbackground_override = \"#1a1117\"\nsurface_override = \"#281a23\"\ntext_override = \"#ffeef4\"\n\n[rainmeter]\nprofile = \"aurora\"\n\n[yasb]\nprofile = \"aurora\"\n",
             ),
             (
                 "cyber.toml",
-                "[profile]\nname = \"Cyber Night\"\nworkspace_name = \"build\"\n\n[wallpaper]\ncurrent = \"cyber\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#54f5ff\"\naccent_soft_override = \"#33c6cf\"\nbackground_override = \"#0b0f1a\"\nsurface_override = \"#121a2b\"\ntext_override = \"#e8f7ff\"\n",
+                "[profile]\nname = \"Cyber Night\"\nworkspace_name = \"build\"\n\n[wallpaper]\ncurrent = \"cyber\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#54f5ff\"\naccent_soft_override = \"#33c6cf\"\nbackground_override = \"#0b0f1a\"\nsurface_override = \"#121a2b\"\ntext_override = \"#e8f7ff\"\n\n[rainmeter]\nprofile = \"hyper\"\n\n[yasb]\nprofile = \"hyper\"\n",
             ),
             (
                 "nebula.toml",
-                "[profile]\nname = \"Nebula\"\nworkspace_name = \"main\"\n\n[wallpaper]\ncurrent = \"nebula\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#9f8dff\"\naccent_soft_override = \"#7465d4\"\nbackground_override = \"#121027\"\nsurface_override = \"#1c1840\"\ntext_override = \"#f2efff\"\n",
+                "[profile]\nname = \"Nebula\"\nworkspace_name = \"main\"\n\n[wallpaper]\ncurrent = \"nebula\"\nsource_type = \"preset\"\nfit_mode = \"fill\"\nauto_extract_palette = true\n\n[theme]\naccent_override = \"#9f8dff\"\naccent_soft_override = \"#7465d4\"\nbackground_override = \"#121027\"\nsurface_override = \"#1c1840\"\ntext_override = \"#f2efff\"\n\n[rainmeter]\nprofile = \"orbit\"\n\n[yasb]\nprofile = \"orbit\"\n",
             ),
         ];
 

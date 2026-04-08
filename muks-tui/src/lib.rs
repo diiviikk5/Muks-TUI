@@ -407,9 +407,17 @@ fn draw(frame: &mut Frame<'_>, app: &Dashboard) {
         .adapters
         .iter()
         .map(|adapter| {
+            let profile = match adapter.tool {
+                ToolName::Lively => "wallpaper".to_string(),
+                ToolName::Rainmeter => app.config.rainmeter.profile.clone(),
+                ToolName::Yasb => app.config.yasb.profile.clone(),
+                ToolName::Komorebi => app.config.komorebi.profile.clone(),
+                ToolName::Windhawk => app.config.windhawk.profile.clone(),
+            };
             ListItem::new(format!(
-                "{} | enabled={} | installed={} | version={} | {:?}",
+                "{} | profile={} | enabled={} | installed={} | version={} | {:?}",
                 adapter.metadata.display_name,
+                profile,
                 app.tool_enabled(adapter.tool),
                 adapter.installed,
                 adapter.version.as_deref().unwrap_or("unknown"),

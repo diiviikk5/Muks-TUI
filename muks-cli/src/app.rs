@@ -92,6 +92,8 @@ struct ReloadCommand {
 #[derive(Subcommand)]
 enum ReloadSubcommand {
     Reload,
+    Profile { profile: String },
+    ListProfiles,
 }
 
 #[derive(Args)]
@@ -366,12 +368,42 @@ fn run_command(cli: Cli) -> Result<()> {
                 let artifact = registry.apply_one("yasb", &request)?;
                 print_apply_result("YASB bar config synced.", &[artifact]);
             }
+            ReloadSubcommand::Profile { profile } => {
+                state.configure_adapter("yasb", None, Some(profile.clone()), None, false)?;
+                let request = build_request(&state, true)?;
+                let artifact = registry.apply_one("yasb", &request)?;
+                print_apply_result(
+                    &format!("YASB bar profile `{}` synced.", profile),
+                    &[artifact],
+                );
+            }
+            ReloadSubcommand::ListProfiles => {
+                println!("Bar profiles:");
+                for profile in bar_profiles() {
+                    println!("  - {}", profile);
+                }
+            }
         },
         Commands::Widgets(command) => match command.command {
             ReloadSubcommand::Reload => {
                 let request = build_request(&state, true)?;
                 let artifact = registry.apply_one("rainmeter", &request)?;
                 print_apply_result("Rainmeter widgets synced.", &[artifact]);
+            }
+            ReloadSubcommand::Profile { profile } => {
+                state.configure_adapter("rainmeter", None, Some(profile.clone()), None, false)?;
+                let request = build_request(&state, true)?;
+                let artifact = registry.apply_one("rainmeter", &request)?;
+                print_apply_result(
+                    &format!("Rainmeter widget profile `{}` synced.", profile),
+                    &[artifact],
+                );
+            }
+            ReloadSubcommand::ListProfiles => {
+                println!("Widget profiles:");
+                for profile in widget_profiles() {
+                    println!("  - {}", profile);
+                }
             }
         },
         Commands::Tile(command) => match command.command {
@@ -681,6 +713,10 @@ fn print_shell_help() {
     println!("  install");
     println!("  theme apply <preset> --best-effort");
     println!("  wallpaper set <name|path|url>");
+    println!("  widgets list-profiles");
+    println!("  widgets profile <aurora|zen|hyper|orbit>");
+    println!("  bar list-profiles");
+    println!("  bar profile <aurora|zen|hyper|orbit>");
     println!("  adapter list");
     println!("  adapter configure yasb --enabled false");
     println!("  backup create");
@@ -712,4 +748,12 @@ fn print_shell_banner() {
 
 fn colorize(text: &str, r: u8, g: u8, b: u8) -> String {
     format!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, text)
+}
+
+fn widget_profiles() -> [&'static str; 4] {
+    ["aurora", "zen", "hyper", "orbit"]
+}
+
+fn bar_profiles() -> [&'static str; 4] {
+    ["aurora", "zen", "hyper", "orbit"]
 }
